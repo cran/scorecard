@@ -4,48 +4,61 @@
 #'
 #' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
 #' @param y Name of y variable.
-#' @param x Name vector of x variables. Default NA. If x is NA, all variables exclude y will counted as x variables.
+#' @param x Name of x variables. Default NULL If x is NULL, all variables exclude y will counted as x variables.
 #' @param positive Value of positive class, default "bad|1".
 #' @param order Logical. If it is TRUE, return descending sorted iv values.
 #'
 #' @return Information Value
-#' @details IV is a very useful concept for variable selection while developing credit scorecards. The formula for information value is shown below: \deqn{IV = \sum(DistributionGood_{i} - DistributionBad_{i})*\ln(\frac{DistributionGood_{i}}{DistributionBad_{i}}).} The log component in information value is defined as weight of evidence (WOE), which is shown as \deqn{WeightofEvidence = \ln(\frac{DistributionGood_{i}}{DistributionBad_{i}}).} The relationship between information value and predictive power is as follows: <0.02 (useless for prediction), 0.02 to 0.1 (Weak predictor), 0.1 to 0.3 (Medium predictor), 0.3 to 0.5 (Strong predictor) and >0.5 (Suspicious or too good to be true).
+#' @details IV is a very useful concept for variable selection while developing credit scorecards. The formula for information value is shown below: \deqn{IV = \sum(DistributionBad_{i} - DistributionGood_{i})*\ln(\frac{DistributionBad_{i}}{DistributionGood_{i}}).} The log component in information value is defined as weight of evidence (WOE), which is shown as \deqn{WeightofEvidence = \ln(\frac{DistributionBad_{i}}{DistributionGood_{i}}).} The relationship between information value and predictive power is as follows: <0.02 (useless for prediction), 0.02 to 0.1 (Weak predictor), 0.1 to 0.3 (Medium predictor), 0.3 to 0.5 (Strong predictor) and >0.5 (Suspicious or too good to be true).
 #'
 #' @examples
 #' # Load German credit data
 #' data(germancredit)
 #'
 #' # information values
-#' iv(germancredit, y = "creditability")
+#' dt_infovalue <- iv(germancredit, y = "creditability")
 #'
 #' @import data.table
 #' @export
 #'
-iv <- function(dt, y, x=NA, positive="bad|1", order="TRUE") {
-  good = bad = DistrBad = DistrGood = miv = V1 = . = NULL # no visible binding for global variable
+iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
+  good = bad = DistrBad = DistrGood = miv = info_value = . = NULL # no visible binding for global variable
 
-  if (anyNA(x) & length(x)==1) x <- setdiff(names(dt), y)
+  # conditions # https://adv-r.hadley.nz/debugging
+  if (!is.data.frame(dt)) stop("Incorrect inputs; dt should be a dataframe.")
+  if (ncol(dt) <=1) stop("Incorrect inputs; dt should have at least two columns.")
+  if (!(y %in% names(dt))) stop(paste0("Incorrect inputs; there is no \"", y, "\" column in dt."))
 
-  dt <- data.table(dt)[
+  # x variable names vector
+  if (is.null(x)) x <- setdiff(names(dt), y)
+
+
+  # data prep
+  dt <- setDT(dt)[
     , x, with = FALSE
     ][, `:=`(
       rowid = as.integer(row.names(.SD)),
       y = ifelse(grepl(positive, dt[[y]]), 1, 0)
     )]
 
-  ivlist <- melt( dt, id = c("rowid", "y") )[
+  # info_value
+  ivlist <- melt(
+    setDT(dt)[, (x) := lapply(.SD, as.character), .SDcols = x],
+    id = c("rowid", "y")
+  )[
     , .(good = sum(y==0), bad = sum(y==1), count=.N), keyby=c("variable", "value")
-    ][, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad")# replace 0 by 0.99 in good/bad column
+    ][, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad")# replace 0 by 0.99 in good/bad columns
     ][, `:=`(DistrGood = good/sum(good), DistrBad = bad/sum(bad) ), by="variable"
     ][, `:=`(
       # woe = log(DistrBad/DistrGood),
       miv = log(DistrBad/DistrGood)*(DistrBad-DistrGood)
-   )][, sum(miv), by="variable"]
+   )][, .(info_value = sum(miv)), by="variable"]
+
 
   if (order==TRUE) {
-    return(ivlist[order(-V1)])
+    return( ivlist[order(-info_value)] )
   } else {
-    return(ivlist)
+    return( ivlist )
   }
 
 }
