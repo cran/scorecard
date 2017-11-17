@@ -46,7 +46,7 @@ m <- glm( y ~ ., family = "binomial", data = dt_woe)
 
 \dontrun{
 # Select a formula-based model by AIC
-m_step <- step(m, direction="both")
+m_step <- step(m, direction="both", trace=FALSE)
 m <- eval(m_step$call)
 # summary(m)
 
@@ -55,7 +55,7 @@ m <- eval(m_step$call)
 
 # performace
 # ks & roc plot
-# perf_plot(dt_woe$y, dt_woe$pred)
+# perf_eva(dt_woe$y, dt_woe$pred)
 }
 
 # scorecard

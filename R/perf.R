@@ -1,8 +1,23 @@
+#' renamed as perf_eva
+#'
+#' The function perf_plot has renamed as perf_eva.
+#'
+#' @param label Label values, such as 0s and 1s, 0 represent for good and 1 for bad.
+#' @param pred Predicted probability values.
+#' @param title Title of plot, default "train".
+#' @param groupnum The group numbers when calculating bad probability, default 20.
+#' @param type Types of performance plot, such as "ks", "lift", "roc", "pr". Default c("ks", "roc").
+#' @param show_plot Logical value, default TRUE. It means whether to show plot.
+#' @param seed An integer. The specify seed is used for random sorting data, default: 186.
+#'
+#' @export
+perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc"), show_plot=TRUE, seed=186) {stop("This function has renamed as perf_eva.")}
+
 #' KS, ROC, Lift, PR
 #'
-#' \code{perf_plot} provides performance evaluations, such as kolmogorov-smirnow(ks), ROC, lift and precision-recall curves, based on provided label and predicted probability values.
+#' \code{perf_eva} provides performance evaluations, such as kolmogorov-smirnow(ks), ROC, lift and precision-recall curves, based on provided label and predicted probability values.
 #'
-#' @name perf_plot
+#' @name perf_eva
 #' @param label Label values, such as 0s and 1s, 0 represent for good and 1 for bad.
 #' @param pred Predicted probability values.
 #' @param title Title of plot, default "train".
@@ -37,32 +52,40 @@
 #' # summary(m1)
 #'
 #' # Select a formula-based model by AIC
-#' m_step <- step(m1, direction="both")
+#' m_step <- step(m1, direction="both", trace=FALSE)
 #' m2 <- eval(m_step$call)
 #' # summary(m2)
 #'
 #' # predicted proability
-#' dt_woe$pred <- predict(m2, type='response', dt_woe)
+#' dt_pred <- predict(m2, type='response', dt_woe)
 #'
 #' # performance ------
 #' # Example I # only ks & auc values
-#' perf_plot(dt_woe$y, dt_woe$pred, show_plot=FALSE)
+#' perf_eva(dt_woe$y, dt_pred, show_plot=FALSE)
 #'
 #' # Example II # ks & roc plot
-#' perf_plot(dt_woe$y, dt_woe$pred)
+#' perf_eva(dt_woe$y, dt_pred)
 #'
 #' # Example III # ks, lift, roc & pr plot
-#' perf_plot(dt_woe$y, dt_woe$pred, type = c("ks","lift","roc","pr"))
+#' perf_eva(dt_woe$y, dt_pred, type = c("ks","lift","roc","pr"))
 #' }
 #' @import data.table ggplot2 gridExtra
 #' @export
 #'
-perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc"), show_plot=TRUE, seed=186) {
+perf_eva <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc"), show_plot=TRUE, seed=186) {
   group = . = good = bad = ks = cumbad = cumgood = value = variable = model = countP = countN = FN = TN = TP = FP = FPR = TPR = precision = recall = NULL # no visible binding for global variable
 
   # inputs checking
-  if (!is.vector(label) || !is.vector(pred)) stop("Incorrect inputs; both label and pred should be vectors")
-  if (length(label) != length(pred)) stop("Incorrect inputs; length of label and pred should be the same")
+  if ( is.data.frame(label) || is.data.frame(pred) || is.list(label) || is.list(pred) ) {
+    stop("Incorrect inputs; both label and pred should be vectors.")
+  } else if ( !is.vector(label) || !is.vector(pred) ) {
+    warning("Incorrect inputs; both label and pred should be vectors, which were set to vectors.")
+    label <- as.vector(label)
+    pred  <- as.vector(pred)
+  }
+
+  if ( length(label) != length(pred) ) stop("Incorrect inputs; label and pred should be vectors with the same length.")
+
 
   # random sort datatable
   set.seed(seed)
@@ -77,9 +100,9 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 
     dfkslift <-
       df1[order(-pred)
-        ][, group := ceiling(as.integer(row.names(.SD))/(.N/groupnum))
+        ][, group := ceiling(.I/(.N/groupnum))
         ][,.(good = sum(label==0), bad = sum(label==1)), by=group
-        ][,`:=`(group= as.integer(row.names(.SD))/.N,
+        ][,`:=`(group= .I/.N,
                 good = good/sum(good), bad  = bad/sum(bad),
                 cumgood= cumsum(good)/sum(good), cumbad = cumsum(bad)/sum(bad))
         ][, ks := cumbad - cumgood]
@@ -210,7 +233,7 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
     }
 
     # return list
-    rt$p <- p
+    rt$pic <- p
   }
 
   return(rt)
@@ -220,18 +243,19 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 #'
 #' \code{perf_psi} calculates population stability index (PSI) based on provided credit score and provides plot of credit score distribution.
 #'
-#' @param score List of credit score for both actual and expected data sample. For example, score <- list(train = df1, test = df2), both df1 and df2 are dataframes with the same column names.
-#' @param label List of label values for both actual and expected data sample. For example, label <- list(train = df1, test = df2), both df1 and df2 are dataframe with the same column names. The label values should be 0s and 1s, 0 represent for good and 1 for bad.
+#' @param score A list of two dataframe, which are credit score for both actual and expected data sample. For example, score <- list(train = df1, test = df2), both df1 and df2 are dataframes with the same column names.
+#' @param label A list of two dataframe, which are label values for both actual and expected data sample. For example, label <- list(train = df1, test = df2), both df1 and df2 are dataframe with the same column names. The label values should be 0s and 1s, 0 represent for good and 1 for bad.
 #' @param title Title of plot, default "".
 #' @param x_limits x-axis limits, default c(0, 800).
 #' @param x_tick_break x-axis ticker break, default 100.
 #' @param show_plot Logical value, default TRUE. It means whether to show plot.
+#' @param return_distr_dat Logical, default FALSE.
 #' @param seed An integer. The specify seed is used for random sorting data, default 186.
 #'
 #' @return a dataframe of psi & plots of credit score distribution
 #' @details The population stability index (PSI) formula is displayed below: \deqn{PSI = \sum((Actual\% - Expected\%)*(\ln(\frac{Actual\%}{Expected\%}))).} The rule of thumb for the PSI is as follows: Less than 0.1 inference insignificant change, no action required; 0.1 - 0.25 inference some minor change, check other scorecard monitoring metrics; Greater than 0.25 inference major shift in population, need to delve deeper.
 #'
-#' @seealso \code{\link{perf_plot}}
+#' @seealso \code{\link{perf_eva}}
 #'
 #' @examples
 #' \dontrun{
@@ -248,13 +272,8 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 #' )]
 #'
 #' # breaking dt into train and test ------
-#' set.seed(125)
-#' dt <- dt[sample(nrow(dt))]
-#' # rowname of train
-#' set.seed(345)
-#' rn <- sample(nrow(dt), nrow(dt)*0.6)
-#' # train and test dt
-#' dt_train <- dt[rn]; dt_test <- dt[-rn];
+#' dt_list <- split_df(dt, "y", ratio = 0.6, seed=21)
+#' dt_train <- dt_list$train; dt_test <- dt_list$test
 #'
 #' # woe binning ------
 #' bins <- woebin(dt_train, "y")
@@ -268,7 +287,7 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 #' # summary(m1)
 #'
 #' # Select a formula-based model by AIC
-#' m_step <- step(m1, direction="both")
+#' m_step <- step(m1, direction="both", trace=FALSE)
 #' m2 <- eval(m_step$call)
 #' # summary(m2)
 #'
@@ -277,8 +296,8 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 #' test_pred <- predict(m2, type='response', test)
 #'
 #' # # ks & roc plot
-#' # perf_plot(train$y, train_pred, title = "train")
-#' # perf_plot(train$y, train_pred, title = "test")
+#' # perf_eva(train$y, train_pred, title = "train")
+#' # perf_eva(train$y, train_pred, title = "test")
 #'
 #' #' # scorecard
 #' card <- scorecard(bins, m2)
@@ -292,14 +311,14 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 #'   score = list(train = train_score, test = test_score),
 #'   label = list(train = train[,"y"], test = test[, "y"])
 #' )
-#' # psi$psi # psi dataframe
-#' # psi$p   # plot of score distribution
+#' # psi$psi  # psi dataframe
+#' # psi$pic  # pic of score distribution
 #'
 #' # Example II # specifying score range
 #' psi_s <- perf_psi(
 #'   score = list(train = train_score, test = test_score),
 #'   label = list(train = train[,"y"], test = test[, "y"]),
-#'   x_limits = c(150, 750),
+#'   x_limits = c(200, 750),
 #'   x_tick_break = 50
 #'   )
 #'
@@ -312,19 +331,20 @@ perf_plot <- function(label, pred, title="train", groupnum=20, type=c("ks", "roc
 #'   score = list(train = train_score2, test = test_score2),
 #'   label = list(train = train[,"y"], test = test[, "y"])
 #' )
-#' # psi2$psi # psi dataframe
-#' # psi2$p   # plot of score distribution
+#' # psi2$psi  # psi dataframe
+#' # psi2$pic  # pic of score distribution
 #' }
 #' @import data.table ggplot2 gridExtra
 #' @export
 #'
-perf_psi <- function(score, label = NULL, title="", x_limits=c(100,800), x_tick_break=50, show_plot=TRUE, seed=186) {
+perf_psi <- function(score, label = NULL, title="", x_limits=c(100,800), x_tick_break=50, show_plot=TRUE, seed=186, return_distr_dat = FALSE) {
   # psi = sum((Actual% - Expected%)*ln(Actual%/Expected%))
 
   . = A = ae = E = PSI = bad = badprob = badprob2 = bin = bin1 = bin2 = count = distr = logAE = midbin = test = train = y = NULL # no visible binding for global variable
-  rt = rt_psi = rt_p = list() # return list
-  rt$psi <- NULL
-  rt$p <- NULL
+  rt = rt_psi = rt_pic = rt_dat = list() # return list
+  # rt$psi <- NULL
+  # rt$pic <- NULL
+  # rt$dat <- NULL
 
 
   # inputs checking
@@ -365,6 +385,7 @@ perf_psi <- function(score, label = NULL, title="", x_limits=c(100,800), x_tick_
     score[[2]]$y <- NA
 
   }
+  # dateset of score and label
   dt_sl <- cbind(rbindlist(score, idcol = "ae")) # ae refers to 'Actual & Expected'
 
   # PSI function
@@ -391,7 +412,9 @@ perf_psi <- function(score, label = NULL, title="", x_limits=c(100,800), x_tick_
   }
 
 
+  set.seed(seed)
   for ( sn in score_names ) {
+    # data manipulation to calculating psi and plot
     if (length(unique(dt_sl[[sn]])) > 10) {
       # breakpoints
       brkp <- unique(c(
@@ -401,18 +424,17 @@ perf_psi <- function(score, label = NULL, title="", x_limits=c(100,800), x_tick_
       ))
 
       # random sort datatable
-      set.seed(seed)
       dat <- dt_sl[sample(1:nrow(dt_sl))][, c("ae", "y", sn), with = FALSE]
 
       dat$bin <- cut(dat[[sn]], brkp, right = FALSE, dig.lab = 10, ordered_result = F)
 
     } else {
       # random sort datatable
-      set.seed(seed)
       dat <- dt_sl[sample(1:nrow(dt_sl))][, c("ae", "y", sn), with = FALSE]
       dat$bin <- dat[[sn]]
 
     }
+
 
     # psi ------
     # rt[[paste0(sn, "_psi")]] <- round(psi(dat), 4)
@@ -456,13 +478,23 @@ perf_psi <- function(score, label = NULL, title="", x_limits=c(100,800), x_tick_
         p_score_distr <- p_score_distr + ggtitle(paste0(sn, "_PSI: ", round(psi(dat), 4)))
       }
 
-      # rt[[paste0(sn, "_p")]] <- p_score_distr
-      rt_p[[sn]] <- p_score_distr
 
+      # return of pic
+      rt_pic[[sn]] <- p_score_distr
+
+      if (return_distr_dat) {
+        rt_dat[[sn]] <- dcast(
+          distr_prob[,.(ae=factor(ae,levels=dt_sl[,unique(ae)]),bin,count,bad,badprob)],
+          bin ~ ae, value.var=c("count","bad","badprob"), sep="_"
+        )[,c(1,2,4,6,3,5,7)]
+      }
     } # end of show plot
   } # end of for loop
+
+  # return
   rt$psi <- rbindlist(rt_psi, idcol = "variable")
-  rt$p <- rt_p
+  rt$pic <- rt_pic
+  if (return_distr_dat) rt$dat <- rt_dat
 
   return(rt)
 }

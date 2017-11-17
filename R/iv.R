@@ -24,20 +24,20 @@
 iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
   good = bad = DistrBad = DistrGood = miv = info_value = . = NULL # no visible binding for global variable
 
-  # conditions # https://adv-r.hadley.nz/debugging
-  if (!is.data.frame(dt)) stop("Incorrect inputs; dt should be a dataframe.")
-  if (ncol(dt) <=1) stop("Incorrect inputs; dt should have at least two columns.")
-  if (!(y %in% names(dt))) stop(paste0("Incorrect inputs; there is no \"", y, "\" column in dt."))
-
-  # x variable names vector
-  if (is.null(x)) x <- setdiff(names(dt), y)
-
+  # set dt as data.table
+  dt <- setDT(dt)
+  # replace "" by NA
+  dt <- rep_blank_na(dt)
+  # check y
+  dt <- check_y(dt, y, positive)
+  # x variable names
+  x <- x_variable(dt,y,x)
 
   # data prep
-  dt <- setDT(dt)[
+  dt <- dt[
     , x, with = FALSE
     ][, `:=`(
-      rowid = as.integer(row.names(.SD)),
+      rowid = .I,
       y = ifelse(grepl(positive, dt[[y]]), 1, 0)
     )]
 
@@ -80,6 +80,8 @@ iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
 # #' dtm[, .(iv = lapply(.SD, iv_01, bad)), by="variable", .SDcols# ="good"]
 # #'
 # #' @import data.table
+#' @import data.table
+#'
 iv_01 <- function(good, bad) {
   DistrBad = DistrGood = miv = NULL # no visible binding for global variable
 
@@ -101,6 +103,8 @@ iv_01 <- function(good, bad) {
 # #'
 # #' @import data.table
 # #'
+#' @import data.table
+#'
 miv_01 <- function(good, bad) {
   DistrBad = DistrGood = miv = NULL # no visible binding for global variable
 
@@ -120,6 +124,8 @@ miv_01 <- function(good, bad) {
 # #' @param bad vector of bad numbers
 # #'
 # #' @import data.table
+#' @import data.table
+#'
 woe_01 <- function(good, bad) {
   DistrBad = DistrGood = woe = NULL # no visible binding for global variable
 

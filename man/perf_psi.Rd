@@ -5,12 +5,13 @@
 \title{PSI}
 \usage{
 perf_psi(score, label = NULL, title = "", x_limits = c(100, 800),
-  x_tick_break = 50, show_plot = TRUE, seed = 186)
+  x_tick_break = 50, show_plot = TRUE, seed = 186,
+  return_distr_dat = FALSE)
 }
 \arguments{
-\item{score}{List of credit score for both actual and expected data sample. For example, score <- list(train = df1, test = df2), both df1 and df2 are dataframes with the same column names.}
+\item{score}{A list of two dataframe, which are credit score for both actual and expected data sample. For example, score <- list(train = df1, test = df2), both df1 and df2 are dataframes with the same column names.}
 
-\item{label}{List of label values for both actual and expected data sample. For example, label <- list(train = df1, test = df2), both df1 and df2 are dataframe with the same column names. The label values should be 0s and 1s, 0 represent for good and 1 for bad.}
+\item{label}{A list of two dataframe, which are label values for both actual and expected data sample. For example, label <- list(train = df1, test = df2), both df1 and df2 are dataframe with the same column names. The label values should be 0s and 1s, 0 represent for good and 1 for bad.}
 
 \item{title}{Title of plot, default "".}
 
@@ -21,6 +22,8 @@ perf_psi(score, label = NULL, title = "", x_limits = c(100, 800),
 \item{show_plot}{Logical value, default TRUE. It means whether to show plot.}
 
 \item{seed}{An integer. The specify seed is used for random sorting data, default 186.}
+
+\item{return_distr_dat}{Logical, default FALSE.}
 }
 \value{
 a dataframe of psi & plots of credit score distribution
@@ -46,13 +49,8 @@ dt <- data.table(germancredit)[, `:=`(
 )]
 
 # breaking dt into train and test ------
-set.seed(125)
-dt <- dt[sample(nrow(dt))]
-# rowname of train
-set.seed(345)
-rn <- sample(nrow(dt), nrow(dt)*0.6)
-# train and test dt
-dt_train <- dt[rn]; dt_test <- dt[-rn];
+dt_list <- split_df(dt, "y", ratio = 0.6, seed=21)
+dt_train <- dt_list$train; dt_test <- dt_list$test
 
 # woe binning ------
 bins <- woebin(dt_train, "y")
@@ -66,7 +64,7 @@ m1 <- glm( y ~ ., family = "binomial", data = train)
 # summary(m1)
 
 # Select a formula-based model by AIC
-m_step <- step(m1, direction="both")
+m_step <- step(m1, direction="both", trace=FALSE)
 m2 <- eval(m_step$call)
 # summary(m2)
 
@@ -75,8 +73,8 @@ train_pred <- predict(m2, type='response', train)
 test_pred <- predict(m2, type='response', test)
 
 # # ks & roc plot
-# perf_plot(train$y, train_pred, title = "train")
-# perf_plot(train$y, train_pred, title = "test")
+# perf_eva(train$y, train_pred, title = "train")
+# perf_eva(train$y, train_pred, title = "test")
 
 #' # scorecard
 card <- scorecard(bins, m2)
@@ -90,14 +88,14 @@ psi <- perf_psi(
   score = list(train = train_score, test = test_score),
   label = list(train = train[,"y"], test = test[, "y"])
 )
-# psi$psi # psi dataframe
-# psi$p   # plot of score distribution
+# psi$psi  # psi dataframe
+# psi$pic  # pic of score distribution
 
 # Example II # specifying score range
 psi_s <- perf_psi(
   score = list(train = train_score, test = test_score),
   label = list(train = train[,"y"], test = test[, "y"]),
-  x_limits = c(150, 750),
+  x_limits = c(200, 750),
   x_tick_break = 50
   )
 
@@ -110,10 +108,10 @@ psi2 <- perf_psi(
   score = list(train = train_score2, test = test_score2),
   label = list(train = train[,"y"], test = test[, "y"])
 )
-# psi2$psi # psi dataframe
-# psi2$p   # plot of score distribution
+# psi2$psi  # psi dataframe
+# psi2$pic  # pic of score distribution
 }
 }
 \seealso{
-\code{\link{perf_plot}}
+\code{\link{perf_eva}}
 }

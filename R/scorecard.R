@@ -2,9 +2,14 @@
 ab <- function(points0=600, odds0=1/60, pdo=50) {
   # ab(600, 1/30, 60)
 
-  # sigmoid function
+
   # library(ggplot2)
+  # sigmoid function
   # ggplot(data.frame(x = c(-5, 5)), aes(x)) + stat_function(fun = function(x) 1/(1+exp(-x)))
+
+  # log_odds function
+  # ggplot(data.frame(x = c(0, 1)), aes(x)) + stat_function(fun = function(x) log(x/(1-x)))
+
 
   # logistic function
   # p(y=1) <- 1/(1+exp(-z)),
@@ -60,7 +65,7 @@ ab <- function(points0=600, odds0=1/60, pdo=50) {
 #'
 #' \dontrun{
 #' # Select a formula-based model by AIC
-#' m_step <- step(m, direction="both")
+#' m_step <- step(m, direction="both", trace=FALSE)
 #' m <- eval(m_step$call)
 #' # summary(m)
 #'
@@ -69,7 +74,7 @@ ab <- function(points0=600, odds0=1/60, pdo=50) {
 #'
 #' # performace
 #' # ks & roc plot
-#' # perf_plot(dt_woe$y, dt_woe$pred)
+#' # perf_eva(dt_woe$y, dt_woe$pred)
 #' }
 #'
 #' # scorecard
@@ -111,15 +116,11 @@ scorecard <- function(bins, model, points0=600, odds0=1/19, pdo=50) {
 
   # scorecard
   scorecard <- list()
-  scorecard[["basepoints"]] <- setDF(
-    data.table( variable = "basepoints", bin = NA, woe = NA, points = round(a - b*coef[1,Estimate]) )
-  )
+  scorecard[["basepoints"]] <- data.table( variable = "basepoints", bin = NA, woe = NA, points = round(a - b*coef[1,Estimate]) )
 
 
   for (i in coef[-1,variable]) {
-    scorecard[[i]] <- setDF(
-      bins[variable==i][, points := round(-b*coef[variable==i, Estimate]*woe)]
-    )
+    scorecard[[i]] <- bins[variable==i][, points := round(-b*coef[variable==i, Estimate]*woe)]
     # [ ,.( variable, bin, numdistr, woe, points = round(-b*coef[variable==i, Estimate]*woe) )]
   }
 
@@ -132,7 +133,8 @@ scorecard <- function(bins, model, points0=600, odds0=1/19, pdo=50) {
 #'
 #' @param dt Original data
 #' @param card Scorecard generated from \code{scorecard}.
-#' @param only_total_score Logical, default TRUE. If it is TRUE, return total credit score only; if FALSE, return both total credit score and score points of each variables.
+#' @param only_total_score  A logical value. Default is TRUE, which means only total credit score is return. Otherwise, if it is FALSE, which means both total credit score and score points of each variables are return.
+#' @param print_step A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.
 #' @return Credit score
 #'
 #' @seealso \code{\link{scorecard}}
@@ -160,7 +162,7 @@ scorecard <- function(bins, model, points0=600, odds0=1/19, pdo=50) {
 #'
 #' \dontrun{
 #' # Select a formula-based model by AIC
-#' m_step <- step(m, direction="both")
+#' m_step <- step(m, direction="both", trace=FALSE)
 #' m <- eval(m_step$call)
 #' # summary(m)
 #'
@@ -169,7 +171,7 @@ scorecard <- function(bins, model, points0=600, odds0=1/19, pdo=50) {
 #'
 #' # performace
 #' # ks & roc plot
-#' # perf_plot(dt_woe$y, dt_woe$pred)
+#' # perf_eva(dt_woe$y, dt_woe$pred)
 #' }
 #'
 #' # scorecard
@@ -187,14 +189,15 @@ scorecard <- function(bins, model, points0=600, odds0=1/19, pdo=50) {
 #' @import data.table
 #' @export
 #'
-scorecard_ply <- function(dt, card, only_total_score = TRUE) {
-  variable = bin = points = . = V1 = score = NULL # no visible binding for global variable
-
-  # conditions # https://adv-r.hadley.nz/debugging
-  if (!is.data.frame(dt)) stop("Incorrect inputs; dt should be a dataframe.")
+scorecard_ply <- function(dt, card, only_total_score = TRUE, print_step=1L) {
+  x_num = variable = bin = points = . = V1 = score = NULL # no visible binding for global variable
 
   # set dt as data.table
   kdt <- copy(setDT(dt))
+  # replace "" by NA
+  kdt <- rep_blank_na(kdt)
+  # print_step
+  print_step <- check_print_step(print_step)
 
   # card # if (is.list(card)) rbindlist(card)
   if (!is.data.table(card)) {
@@ -207,17 +210,16 @@ scorecard_ply <- function(dt, card, only_total_score = TRUE) {
 
   # x variables
   x <- card[variable != "basepoints", unique(variable)]
-  # if (anyNA(x)) {
-  #   if (length(setdiff(names(kdt), y)) >= length(card[,unique(variable)])) {
-  #     x <- card[,unique(variable)]
-  #   } else {
-  #     x <- setdiff(names(kdt), y)
-  #   }
-  # }
 
+  # parameter for print
+  x_num <- 1
+  x_length <- length(x)
   # loop on x variables
   for (a in x) {
-    print(a)
+    # print variables
+    if (print_step > 0 & x_num %% print_step == 0) cat(paste0(format(c(x_num,x_length)),collapse = "/"), a,"\n")
+    x_num <- x_num+1
+
     cardx <- card[variable==a] #card[[a]]
     na_points <- cardx[bin == "missing", points]
 

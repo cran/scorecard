@@ -4,14 +4,16 @@
 \alias{scorecard_ply}
 \title{Application of Scorecard}
 \usage{
-scorecard_ply(dt, card, only_total_score = TRUE)
+scorecard_ply(dt, card, only_total_score = TRUE, print_step = 1L)
 }
 \arguments{
 \item{dt}{Original data}
 
 \item{card}{Scorecard generated from \code{scorecard}.}
 
-\item{only_total_score}{Logical, default TRUE. If it is TRUE, return total credit score only; if FALSE, return both total credit score and score points of each variables.}
+\item{only_total_score}{A logical value. Default is TRUE, which means only total credit score is return. Otherwise, if it is FALSE, which means both total credit score and score points of each variables are return.}
+
+\item{print_step}{A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.}
 }
 \value{
 Credit score
@@ -42,7 +44,7 @@ m <- glm( y ~ ., family = "binomial", data = dt_woe)
 
 \dontrun{
 # Select a formula-based model by AIC
-m_step <- step(m, direction="both")
+m_step <- step(m, direction="both", trace=FALSE)
 m <- eval(m_step$call)
 # summary(m)
 
@@ -51,7 +53,7 @@ m <- eval(m_step$call)
 
 # performace
 # ks & roc plot
-# perf_plot(dt_woe$y, dt_woe$pred)
+# perf_eva(dt_woe$y, dt_woe$pred)
 }
 
 # scorecard
