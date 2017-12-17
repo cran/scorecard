@@ -16,25 +16,27 @@
 #' data(germancredit)
 #'
 #' # information values
-#' dt_infovalue <- iv(germancredit, y = "creditability")
+#' dt_infovalue = iv(germancredit, y = "creditability")
 #'
 #' @import data.table
 #' @export
 #'
-iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
+iv = function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
   good = bad = DistrBad = DistrGood = miv = info_value = . = NULL # no visible binding for global variable
 
   # set dt as data.table
-  dt <- setDT(dt)
+  dt = setDT(dt)
+  # remove date/time col
+  dt = rm_datetime_col(dt)
   # replace "" by NA
-  dt <- rep_blank_na(dt)
+  dt = rep_blank_na(dt)
   # check y
-  dt <- check_y(dt, y, positive)
+  dt = check_y(dt, y, positive)
   # x variable names
-  x <- x_variable(dt,y,x)
+  x = x_variable(dt,y,x)
 
   # data prep
-  dt <- dt[
+  dt = dt[
     , x, with = FALSE
     ][, `:=`(
       rowid = .I,
@@ -42,17 +44,15 @@ iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
     )]
 
   # info_value
-  ivlist <- melt(
+  ivlist = melt(
     setDT(dt)[, (x) := lapply(.SD, as.character), .SDcols = x],
     id = c("rowid", "y")
   )[
     , .(good = sum(y==0), bad = sum(y==1), count=.N), keyby=c("variable", "value")
     ][, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad")# replace 0 by 0.99 in good/bad columns
     ][, `:=`(DistrGood = good/sum(good), DistrBad = bad/sum(bad) ), by="variable"
-    ][, `:=`(
-      # woe = log(DistrBad/DistrGood),
-      miv = log(DistrBad/DistrGood)*(DistrBad-DistrGood)
-   )][, .(info_value = sum(miv)), by="variable"]
+    ][, miv := (DistrBad-DistrGood)*log(DistrBad/DistrGood)
+    ][, .(info_value = sum(miv)), by="variable"]
 
 
   if (order==TRUE) {
@@ -73,7 +73,7 @@ iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
 # #'
 # #' @examples
 # #' # iv_01(good, bad)
-# #' dtm <- melt(dt, id = 'creditability')[, .(
+# #' dtm = melt(dt, id = 'creditability')[, .(
 # #' good = sum(creditability=="good"), bad = sum(creditability=="bad")
 # #' ), keyby = c("variable", "value")]
 # #'
@@ -82,14 +82,14 @@ iv <- function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
 # #' @import data.table
 #' @import data.table
 #'
-iv_01 <- function(good, bad) {
+iv_01 = function(good, bad) {
   DistrBad = DistrGood = miv = NULL # no visible binding for global variable
 
   data.table(
     good = good, bad = bad
   )[, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad") # replace 0 by 0.99 in good/bad column
   ][, `:=`(DistrGood = good/sum(good), DistrBad = bad/sum(bad) )
-  ][, `:=`(miv = log(DistrBad/DistrGood)*(DistrBad-DistrGood) )
+  ][, miv := (DistrBad-DistrGood)*log(DistrBad/DistrGood)
   ][, sum(miv)]
 
 }
@@ -105,14 +105,14 @@ iv_01 <- function(good, bad) {
 # #'
 #' @import data.table
 #'
-miv_01 <- function(good, bad) {
+miv_01 = function(good, bad) {
   DistrBad = DistrGood = miv = NULL # no visible binding for global variable
 
   data.table(
     good = good, bad = bad
   )[, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad") # replace 0 by 0.99 in good/bad column
   ][, `:=`(DistrGood = good/sum(good), DistrBad = bad/sum(bad) )
-  ][, `:=`( miv = log(DistrBad/DistrGood)*(DistrBad-DistrGood) )
+  ][, miv := (DistrBad-DistrGood)*log(DistrBad/DistrGood)
   ][, miv]
 }
 
@@ -126,13 +126,13 @@ miv_01 <- function(good, bad) {
 # #' @import data.table
 #' @import data.table
 #'
-woe_01 <- function(good, bad) {
+woe_01 = function(good, bad) {
   DistrBad = DistrGood = woe = NULL # no visible binding for global variable
 
   data.table(
     good = good, bad = bad
   )[, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad") # replace 0 by 0.99 in good/bad column
   ][, `:=`(DistrGood = good/sum(good), DistrBad = bad/sum(bad) )
-  ][, `:=`(woe = log(DistrBad/DistrGood))
+  ][, woe := log(DistrBad/DistrGood)
   ][, woe]
 }

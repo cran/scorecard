@@ -5,7 +5,7 @@
 \title{WOE Binning}
 \usage{
 woebin(dt, y, x = NULL, breaks_list = NULL, min_perc_total = 0.02,
-  stop_limit = 0.1, max_bin_num = 5, positive = "bad|1", order = FALSE,
+  stop_limit = 0.1, max_bin_num = 5, positive = "bad|1",
   print_step = 1L)
 }
 \arguments{
@@ -25,8 +25,6 @@ woebin(dt, y, x = NULL, breaks_list = NULL, min_perc_total = 0.02,
 
 \item{positive}{Value of positive class, default "bad|1".}
 
-\item{order}{Logical. If it is TRUE, return binning information by descending sorted iv values.}
-
 \item{print_step}{A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.}
 }
 \value{
@@ -41,34 +39,36 @@ data(germancredit)
 
 # Example I
 # binning for two variables in germancredit dataset
-bins_2var <- woebin(germancredit, y = "creditability", x = c("credit.amount", "purpose"))
+bins_2var = woebin(germancredit, y = "creditability", x = c("credit.amount", "purpose"))
 
 \dontrun{
 # Example II
 # binning for germancredit dataset
-bins_germ <- woebin(germancredit, y = "creditability")
+bins_germ = woebin(germancredit, y = "creditability")
+# converting bins_germ into a dataframe
+# bins_germ_df = data.table::rbindlist(bins_germ)
 
 # Example III
 # customizing stop_limit (info-value grain ratio) for each variable
-bins_cus_sl <- woebin(germancredit, y="creditability",
+bins_cus_sl = woebin(germancredit, y="creditability",
   x=c("age.in.years", "credit.amount", "housing", "purpose"),
   stop_limit=c(0.05,0.1,0.01,0.1))
 
 # Example IV
 # customizing the breakpoints of binning
-breaks_list <- list(
+breaks_list = list(
   age.in.years = c(25, 35, 40, 60),
   credit.amount = NULL,
   housing = c("own", "for free\%,\%rent"),
   purpose = NULL
 )
 
-bins_cus_brk <- woebin(germancredit, y="creditability",
+bins_cus_brk = woebin(germancredit, y="creditability",
   x=c("age.in.years", "credit.amount", "housing", "purpose"),
   breaks_list=breaks_list)
 }
 
 }
 \seealso{
-\code{\link{woebin_ply}}, \code{\link{woebin_plot}}
+\code{\link{woebin_ply}}, \code{\link{woebin_plot}}, \code{\link{woebin_adj}}
 }

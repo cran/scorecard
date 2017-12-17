@@ -5,12 +5,12 @@
 \title{KS, ROC, Lift, PR}
 \usage{
 perf_eva(label, pred, title = "train", groupnum = 20, type = c("ks",
-  "roc"), show_plot = TRUE, seed = 186)
+  "roc"), show_plot = TRUE, positive = "bad|1", seed = 186)
 }
 \arguments{
 \item{label}{Label values, such as 0s and 1s, 0 represent for good and 1 for bad.}
 
-\item{pred}{Predicted probability values.}
+\item{pred}{Predicted probability or score.}
 
 \item{title}{Title of plot, default "train".}
 
@@ -19,6 +19,8 @@ perf_eva(label, pred, title = "train", groupnum = 20, type = c("ks",
 \item{type}{Types of performance plot, such as "ks", "lift", "roc", "pr". Default c("ks", "roc").}
 
 \item{show_plot}{Logical value, default TRUE. It means whether to show plot.}
+
+\item{positive}{Value of positive class, default "bad|1".}
 
 \item{seed}{An integer. The specify seed is used for random sorting data, default: 186.}
 }
@@ -38,26 +40,26 @@ library(scorecard)
 data("germancredit")
 
 # rename creditability as y
-dt <- data.table(germancredit)[, `:=`(
+dt = data.table(germancredit)[, `:=`(
   y = ifelse(creditability == "bad", 1, 0),
   creditability = NULL
 )]
 
 # woe binning ------
-bins <- woebin(dt, "y")
-dt_woe <- woebin_ply(dt, bins)
+bins = woebin(dt, "y")
+dt_woe = woebin_ply(dt, bins)
 
 # glm ------
-m1 <- glm( y ~ ., family = "binomial", data = dt_woe)
+m1 = glm( y ~ ., family = "binomial", data = dt_woe)
 # summary(m1)
 
 # Select a formula-based model by AIC
-m_step <- step(m1, direction="both", trace=FALSE)
-m2 <- eval(m_step$call)
+m_step = step(m1, direction="both", trace=FALSE)
+m2 = eval(m_step$call)
 # summary(m2)
 
 # predicted proability
-dt_pred <- predict(m2, type='response', dt_woe)
+dt_pred = predict(m2, type='response', dt_woe)
 
 # performance ------
 # Example I # only ks & auc values

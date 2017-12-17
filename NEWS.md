@@ -1,3 +1,9 @@
+# scorecard 0.1.4
+
+* perf_eva supports both predicted probability and score.
+* Added the woebin_adj function which can interactively adjust the binning info from woebin.
+* Reviewed woebin function.
+
 # scorecard 0.1.3
 
 * Modified the format of printing message and added condition functions.
