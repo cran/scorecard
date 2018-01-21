@@ -4,13 +4,13 @@
 rm_datetime_col = function(dt) {
   dt = setDT(dt)
 
-  isdatetime = function(x) (class(x)[1] %in% c("date","POSIXlt","POSIXct","POSIXt")) == TRUE
+  isdatetime = function(x) (class(x)[1] %in% c("Date","POSIXlt","POSIXct","POSIXt")) == TRUE
   datetime_col = names(which(dt[,sapply(.SD, isdatetime)]))
 
   if (length(datetime_col) > 0) {
     warning(paste0("The date/times columns (",paste0(datetime_col,collapse = ","),") are removed from input dataset."))
 
-    dt = dt[,(datetime_col) := NULL]
+    dt = copy(dt)[,(datetime_col) := NULL]
   }
 
   return(dt)
@@ -87,12 +87,10 @@ check_print_step = function(print_step) {
 x_variable = function(dt, y, x) {
   x_all = setdiff(names(dt), y)
 
-  if (is.null(x)) {
-    x = x_all
-  }
+  if (is.null(x)) x = x_all
 
   if ( length(setdiff(x,x_all)) > 0 ) {
-    warning(paste0("Incorrect inputs; the variables \n\"", paste0(setdiff(x,x_all),collapse = ","), "\"\n are not exist in input data, which are removed."))
+    warning(paste0("Incorrect inputs; the variables \n\"", paste0(setdiff(x,x_all), collapse = ","), "\"\n are not exist in input data, which are removed."))
     x = intersect(x, x_all)
   }
 

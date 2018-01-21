@@ -1,3 +1,9 @@
+# scorecard 0.1.5
+
+* Fixed a bug in scorecard function when calculating the coefficients.
+* Fixed a bug in perf_eva when type="lift". 
+* Fixed a bug in functions of woebin and var_filter when removing Date columns. 
+
 # scorecard 0.1.4
 
 * perf_eva supports both predicted probability and score.
