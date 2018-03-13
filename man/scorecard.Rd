@@ -18,7 +18,7 @@ scorecard(bins, model, points0 = 600, odds0 = 1/19, pdo = 50,
 
 \item{pdo}{Points to Double the Odds, default 50.}
 
-\item{basepoints_eq0}{Logical, default FALSE. If it is TRUE, the basepoints equals 0 and will equally add to variables' points.}
+\item{basepoints_eq0}{Logical, default is FALSE. If it is TRUE, the basepoints will equally distribute to each variable points.}
 }
 \value{
 scorecard
@@ -27,45 +27,37 @@ scorecard
 \code{scorecard} creates a scorecard based on the results from \code{woebin} and \code{glm}.
 }
 \examples{
-library(data.table)
-library(scorecard)
-
+\dontrun{
 # load germancredit data
 data("germancredit")
 
-# select only 5 x variables and rename creditability as y
-dt = setDT(germancredit)[, c(1:5, 21)][, `:=`(
-  y = ifelse(creditability == "bad", 1, 0),
-  creditability = NULL
-)]
+# filter variable via missing rate, iv, identical value rate
+dt_sel = var_filter(germancredit, "creditability")
 
 # woe binning ------
-bins = woebin(dt, "y")
-dt_woe = woebin_ply(dt, bins)
+bins = woebin(dt_sel, "creditability")
+dt_woe = woebin_ply(dt_sel, bins)
 
 # glm ------
-m = glm( y ~ ., family = "binomial", data = dt_woe)
+m = glm(creditability ~ ., family = "binomial", data = dt_woe)
 # summary(m)
 
-\dontrun{
 # Select a formula-based model by AIC
 m_step = step(m, direction="both", trace=FALSE)
 m = eval(m_step$call)
 # summary(m)
 
 # predicted proability
-# dt_woe$pred = predict(m, type='response', dt_woe)
+# dt_pred = predict(m, type='response', dt_woe)
 
 # performace
 # ks & roc plot
-# perf_eva(dt_woe$y, dt_woe$pred)
-}
+# perf_eva(dt_woe$creditability, dt_pred)
 
 # scorecard
 # Example I # creat a scorecard
 card = scorecard(bins, m)
 
-\dontrun{
 # credit score
 # Example I # only total score
 score1 = scorecard_ply(dt, card)

@@ -5,15 +5,15 @@
 \title{WOE Binning}
 \usage{
 woebin(dt, y, x = NULL, breaks_list = NULL, min_perc_total = 0.02,
-  stop_limit = 0.1, max_bin_num = 5, positive = "bad|1",
-  print_step = 1L)
+  stop_limit = 0.1, max_bin_num = 6, positive = "bad|1",
+  no_cores = NULL, print_step = 0L)
 }
 \arguments{
 \item{dt}{A data frame with both x (predictor/feature) and y (response/label) variables.}
 
 \item{y}{Name of y variable.}
 
-\item{x}{Name of x variables. Default NULL If x is NULL, all variables exclude y will counted as x variables.}
+\item{x}{Name of x variables. Default is NULL. If x is NULL, then all variables except y are counted as x variables.}
 
 \item{breaks_list}{List of break points, defaults NULL If it is not NULL, variable binning will based on the provided breaks.}
 
@@ -25,7 +25,9 @@ woebin(dt, y, x = NULL, breaks_list = NULL, min_perc_total = 0.02,
 
 \item{positive}{Value of positive class, default "bad|1".}
 
-\item{print_step}{A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.}
+\item{no_cores}{Number of CPU cores for parallel computation. Defaults NULL. If no_cores is NULL, the no_cores will set as 1 if length of x variables less than 20, and will set as the number of all CPU cores if the length of x variables greater than or equal to 20.}
+
+\item{print_step}{A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.}
 }
 \value{
 Optimal or customized binning information
@@ -38,26 +40,20 @@ Optimal or customized binning information
 data(germancredit)
 
 # Example I
-# binning for two variables in germancredit dataset
+# binning of two variables in germancredit dataset
 bins_2var = woebin(germancredit, y = "creditability", x = c("credit.amount", "purpose"))
 
 \dontrun{
 # Example II
-# binning for germancredit dataset
+# binning of the germancredit dataset
 bins_germ = woebin(germancredit, y = "creditability")
 # converting bins_germ into a dataframe
 # bins_germ_df = data.table::rbindlist(bins_germ)
 
 # Example III
-# customizing stop_limit (info-value grain ratio) for each variable
-bins_cus_sl = woebin(germancredit, y="creditability",
-  x=c("age.in.years", "credit.amount", "housing", "purpose"),
-  stop_limit=c(0.05,0.1,0.01,0.1))
-
-# Example IV
 # customizing the breakpoints of binning
 breaks_list = list(
-  age.in.years = c(25, 35, 40, 60),
+  age.in.years = c(26, 35, 37),
   credit.amount = NULL,
   housing = c("own", "for free\%,\%rent"),
   purpose = NULL

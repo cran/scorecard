@@ -10,11 +10,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<meta name="author" content="Vignette Author" />
+<meta name="author" content="shichen xie" />
 
-<meta name="date" content="2018-01-21" />
+<meta name="date" content="2018-03-13" />
 
-<title>Vignette Title</title>
+<title>demo</title>
 
 
 
@@ -68,52 +68,56 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 
 
 
-<h1 class="title toc-ignore">Vignette Title</h1>
-<h4 class="author"><em>Vignette Author</em></h4>
-<h4 class="date"><em>2018-01-21</em></h4>
+<h1 class="title toc-ignore">demo</h1>
+<h4 class="author"><em>shichen xie</em></h4>
+<h4 class="date"><em>2018-03-13</em></h4>
 
 
 
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Traditional Credit Scoring Using Logistic Regression</span>
-<span class="kw">library</span>(data.table)
 <span class="kw">library</span>(scorecard)
 
 <span class="co"># data prepare ------</span>
 <span class="co"># load germancredit data</span>
 <span class="kw">data</span>(<span class="st">&quot;germancredit&quot;</span>)
 
-<span class="co"># set creditability as 1 or 0</span>
-dt =<span class="st"> </span><span class="kw">setDT</span>(germancredit)[,creditability <span class="op">:</span><span class="er">=</span><span class="st"> </span><span class="kw">ifelse</span>(creditability<span class="op">==</span><span class="st">&quot;bad&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>)]
-
 <span class="co"># filter variable via missing rate, iv, identical value rate</span>
-dt_s =<span class="st"> </span><span class="kw">var_filter</span>(dt, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>)
+dt_s =<span class="st"> </span><span class="kw">var_filter</span>(germancredit, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>)
 
 <span class="co"># breaking dt into train and test</span>
 dt_list =<span class="st"> </span><span class="kw">split_df</span>(dt_s, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>, <span class="dt">ratio =</span> <span class="fl">0.6</span>, <span class="dt">seed =</span> <span class="dv">30</span>)
 train =<span class="st"> </span>dt_list<span class="op">$</span>train; test =<span class="st"> </span>dt_list<span class="op">$</span>test;
 
 <span class="co"># woe binning ------</span>
-bins =<span class="st"> </span><span class="kw">woebin</span>(dt_s, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>, <span class="dt">print_step =</span> <span class="dv">1</span>)
+bins =<span class="st"> </span><span class="kw">woebin</span>(dt_s, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>)
 <span class="co"># woebin_plot(bins)</span>
 
 <span class="co"># binning adjustment</span>
-## adjust breaks interactively
-<span class="co"># breaks_adj = woebin_adj(bins, dt_s, &quot;creditability&quot;) </span>
-## or specify breaks manually
+<span class="co"># # adjust breaks interactively</span>
+<span class="co"># breaks_adj = woebin_adj(dt_s, &quot;creditability&quot;, bins) </span>
+<span class="co"># # or specify breaks manually</span>
 breaks_adj =<span class="st"> </span><span class="kw">list</span>(
   <span class="dt">age.in.years=</span><span class="kw">c</span>(<span class="dv">26</span>, <span class="dv">35</span>, <span class="dv">40</span>),
   <span class="dt">other.debtors.or.guarantors=</span><span class="kw">c</span>(<span class="st">&quot;none&quot;</span>, <span class="st">&quot;co-applicant%,%guarantor&quot;</span>))
-bins_adj =<span class="st"> </span><span class="kw">woebin</span>(dt_s, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>, <span class="dt">breaks_list=</span>breaks_adj, <span class="dt">print_step=</span><span class="dv">0</span>)
+bins_adj =<span class="st"> </span><span class="kw">woebin</span>(dt_s, <span class="dt">y=</span><span class="st">&quot;creditability&quot;</span>, <span class="dt">breaks_list=</span>breaks_adj)
 
 <span class="co"># converting train and test into woe values</span>
-train_woe =<span class="st"> </span><span class="kw">woebin_ply</span>(train, bins_adj, <span class="dt">print_step=</span><span class="dv">0</span>)
-test_woe =<span class="st"> </span><span class="kw">woebin_ply</span>(test, bins_adj, <span class="dt">print_step=</span><span class="dv">0</span>)
+train_woe =<span class="st"> </span><span class="kw">woebin_ply</span>(train, bins_adj)
+test_woe =<span class="st"> </span><span class="kw">woebin_ply</span>(test, bins_adj)
 
 <span class="co"># glm ------</span>
 m1 =<span class="st"> </span><span class="kw">glm</span>( creditability <span class="op">~</span><span class="st"> </span>., <span class="dt">family =</span> <span class="st">&quot;binomial&quot;</span>, <span class="dt">data =</span> train_woe)
 <span class="co"># summary(m1)</span>
 
-<span class="co"># Select a formula-based model by AIC</span>
+<span class="co"># # Adjusting for oversampling (support.sas.com/kb/22/601.html)</span>
+<span class="co"># p1=0.03; r1=0.3</span>
+<span class="co"># dt_woe = dt_woe[, weight := ifelse(y==1, p1/r1, (1-p1)/(1-r1) )]</span>
+<span class="co"># </span>
+<span class="co"># fmla = as.formula(paste(&quot;y ~&quot;, paste(names(dt_woe)[2:21], collapse=&quot;+&quot;)))</span>
+<span class="co"># m1 = glm(fmla, family = &quot;binomial&quot;, data = dt_woe, weights = weight)</span>
+
+
+<span class="co"># Select a formula-based model by AIC (or by LASSO)</span>
 m_step =<span class="st"> </span><span class="kw">step</span>(m1, <span class="dt">direction=</span><span class="st">&quot;both&quot;</span>, <span class="dt">trace =</span> <span class="ot">FALSE</span>)
 m2 =<span class="st"> </span><span class="kw">eval</span>(m_step<span class="op">$</span>call)
 <span class="co"># summary(m2)</span>

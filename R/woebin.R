@@ -1,3 +1,7 @@
+# [tree-like]
+# [chimerge](http://blog.csdn.net/qunxingvip/article/details/50449376)
+
+
 # required in woebin2 # return binning if provide breaks
 #' @import data.table
 woebin2_breaks = function(dtm, breaks) {
@@ -10,8 +14,24 @@ woebin2_breaks = function(dtm, breaks) {
     bstbrks = c(-Inf, setdiff(unique(breaks), c(NA, Inf, -Inf)), Inf)
 
     binning = dtm[
-      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)
-      ][, .(good = sum(y==0), bad = sum(y==1), variable=unique(variable)) , keyby = bin
+      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)]
+
+    # break points from bin
+    breaks_list = lapply(
+      list(left="\\1", right="\\2"),
+      function(x) setdiff(sub("^\\[(.*),(.*)\\)", x, unique(binning$bin)), c(" Inf", "Inf", " -Inf", "-Inf")) )
+
+    # if there are empty bins
+    if (!setequal(breaks_list$left, breaks_list$right)) {
+      bstbrks = unique(c(-Inf, unique(breaks_list$right), Inf))
+      binning = dtm[
+        , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)]
+
+      warning( paste0("The break points are modified into \'", paste0(breaks_list$right, collapse = ", "), "\'. There are empty bins based on the provided break points." ) )
+    }
+
+
+    binning = binning[, .(good = sum(y==0), bad = sum(y==1), variable=unique(variable)) , keyby = bin
       ][order(bin)]
 
   } else if (is.factor(dtm[,value]) || is.character(dtm[,value])) {
@@ -98,7 +118,7 @@ woebin2_init_bin = function(dtm, min_perc_total) {
 
   }
 
-  # remove brkp that good == 0 | bad == 0 ------
+  # remove brkp that good == 0 or bad == 0 ------
   while (init_bin[!is.na(brkp)][good==0 | bad==0,.N] > 0) {
     # brkp needs to be removed if good==0 or bad==0
     rm_brkp = init_bin[!is.na(brkp)][
@@ -167,8 +187,8 @@ woebin2_tree_1bst = function(dtm, initial_binning, min_perc_total, bestbreaks=NU
   }
   total_iv_all_brks = total_iv_all_breaks(initial_binning, bestbreaks)
 
-  # bestbreaks: total_iv==max(total_iv) & min(count_distr)>=0.2
-  bstbrk_max_iv = total_iv_all_brks[min_count_distr >= min_perc_total][total_iv==max(total_iv), bstbin]
+  # bestbreaks: total_iv==max(total_iv) & min(count_distr)>=min_perc_total*2.5(0.05)
+  bstbrk_max_iv = total_iv_all_brks[min_count_distr >= min_perc_total*2][total_iv==max(total_iv), bstbin]
   # add 1best break to bestbreaks
   bestbreaks = unique(c(bestbreaks, bstbrk_max_iv[1]))
 
@@ -204,13 +224,13 @@ woebin2_tree_1bst = function(dtm, initial_binning, min_perc_total, bestbreaks=NU
   return(bin_add_1bst)
 }
 # required in woebin2 # return tree-like binning
-woebin2_tree = function(dtm, initial_binning, min_perc_total=0.02, stop_limit=0.1, max_bin_num=5) {
+woebin2_tree = function(dtm, initial_binning, min_perc_total=0.02, stop_limit=0.1, max_bin_num=6) {
   # global variables or functions
   brkp = bstbrkp = total_iv = binning_tree = NULL
 
   # initialize parameters
   len_brks = initial_binning[!is.na(brkp), .N] ## length all breaks
-  bestbreaks=NULL ## best breaks
+  bestbreaks = NULL ## best breaks
   IVt1 = IVt2 = 1e-10
   IVchg = 1 ## IV gain ratio
   step_num = 1
@@ -265,21 +285,21 @@ binning_format = function(binning) {
 
 # woebin2
 # This function provides woe binning for only two columns (one x and one y) dataframe.
-woebin2 = function(dt, y, x, breaks=NULL, min_perc_total=0.02, stop_limit=0.1, max_bin_num=5) {
+woebin2 = function(y, x, x_name, breaks=NULL, min_perc_total=0.02, stop_limit=0.1, max_bin_num=6) {
   # global variables or functions
   . = bad = badprob = bin = bin_iv = good = total_iv = variable = woe = NULL
 
   # data(germancredit)
   # numerical data
-  # dt = setDT(germancredit)[, .(y=creditability, age.in.years)][,y:=ifelse(y=="good",1,0)];
-  # y="y"; x="age.in.years"
+  # dt = setDT(germancredit)[,`:=`(y=ifelse(creditability=="good",1,0), creditability=NULL)];
+  # y="y"; x="foreign.worker"age.in.years"
 
   # categorical data
-  # dt = setDT(germancredit)[, .(y=creditability, status.of.existing.checking.account)][,y:=ifelse(y=="good",1,0)];
   # y="y"; x="status.of.existing.checking.account"
 
   # melt data.table
-  dtm = data.table(y=dt[[y]], variable=x, value=dt[[x]])
+  # dtm = data.table(y=dt[[y]], variable=x, value=dt[[x]])
+  dtm = data.table(y=y, variable=x_name, value=x)
 
 
   # binning
@@ -310,13 +330,14 @@ woebin2 = function(dt, y, x, breaks=NULL, min_perc_total=0.02, stop_limit=0.1, m
 #' @name woebin
 #' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
 #' @param y Name of y variable.
-#' @param x Name of x variables. Default NULL If x is NULL, all variables exclude y will counted as x variables.
+#' @param x Name of x variables. Default is NULL. If x is NULL, then all variables except y are counted as x variables.
 #' @param breaks_list List of break points, defaults NULL If it is not NULL, variable binning will based on the provided breaks.
 #' @param min_perc_total The share of initial binning class number over total. Accepted range: 0.01-0.2; default 0.02.
 #' @param stop_limit Stop binning segmentation when information value gain ratio less than the stop_limit. Accepted range: 0-0.5; default 0.1.
 #' @param max_bin_num Integer. The maximum binning number.
 #' @param positive Value of positive class, default "bad|1".
-#' @param print_step A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.
+#' @param no_cores Number of CPU cores for parallel computation. Defaults NULL. If no_cores is NULL, the no_cores will set as 1 if length of x variables less than 20, and will set as the number of all CPU cores if the length of x variables greater than or equal to 20.
+#' @param print_step A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.
 #' @return Optimal or customized binning information
 #'
 #' @seealso \code{\link{woebin_ply}}, \code{\link{woebin_plot}}, \code{\link{woebin_adj}}
@@ -326,26 +347,20 @@ woebin2 = function(dt, y, x, breaks=NULL, min_perc_total=0.02, stop_limit=0.1, m
 #' data(germancredit)
 #'
 #' # Example I
-#' # binning for two variables in germancredit dataset
+#' # binning of two variables in germancredit dataset
 #' bins_2var = woebin(germancredit, y = "creditability", x = c("credit.amount", "purpose"))
 #'
 #' \dontrun{
 #' # Example II
-#' # binning for germancredit dataset
+#' # binning of the germancredit dataset
 #' bins_germ = woebin(germancredit, y = "creditability")
 #' # converting bins_germ into a dataframe
 #' # bins_germ_df = data.table::rbindlist(bins_germ)
 #'
 #' # Example III
-#' # customizing stop_limit (info-value grain ratio) for each variable
-#' bins_cus_sl = woebin(germancredit, y="creditability",
-#'   x=c("age.in.years", "credit.amount", "housing", "purpose"),
-#'   stop_limit=c(0.05,0.1,0.01,0.1))
-#'
-#' # Example IV
 #' # customizing the breakpoints of binning
 #' breaks_list = list(
-#'   age.in.years = c(25, 35, 40, 60),
+#'   age.in.years = c(26, 35, 37),
 #'   credit.amount = NULL,
 #'   housing = c("own", "for free%,%rent"),
 #'   purpose = NULL
@@ -356,13 +371,15 @@ woebin2 = function(dt, y, x, breaks=NULL, min_perc_total=0.02, stop_limit=0.1, m
 #'   breaks_list=breaks_list)
 #' }
 #'
-#' @import data.table
-#' @importFrom stats IQR quantile
+#' @import data.table foreach
+#' @importFrom stats IQR quantile setNames
+#' @importFrom doParallel registerDoParallel stopImplicitCluster
+#' @importFrom parallel detectCores
 #' @export
 #'
-woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_limit=0.1, max_bin_num=5, positive="bad|1", print_step=1L) {
-  # global variables
-  # detectCores = makeCluster = parLapply = NULL
+woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_limit=0.1, max_bin_num=6, positive="bad|1", no_cores=NULL, print_step=0L) {
+  # global variable
+  i = NULL
 
   # set dt as data.table
   dt = setDT(dt)
@@ -374,6 +391,7 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_lim
   dt = check_y(dt, y, positive)
   # x variable names
   xs = x_variable(dt,y,x)
+  xs_len = length(xs)
   # print_step
   print_step = check_print_step(print_step)
 
@@ -402,16 +420,16 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_lim
     }
   }
 
-  # stop_limit vector
-  if (length(stop_limit) == 1) {
-    stop_limit = rep(stop_limit, length(xs))
-  } else if (length(stop_limit) != length(xs)) {
-    stop("Incorrect inputs; the length of stop_limit should be 1 or the same as x variables.")
-  }
+  # # stop_limit vector
+  # if (length(stop_limit) == 1) {
+  #   stop_limit = rep(stop_limit, length(xs))
+  # } else if (length(stop_limit) != length(xs)) {
+  #   stop("Incorrect inputs; the length of stop_limit should be 1 or the same as x variables.")
+  # }
   # stop_limit range
   if ( stop_limit<0 || stop_limit>0.5 || !is.numeric(stop_limit) ) {
     warning("Incorrect parameter specification; accepted stop_limit parameter range is 0-0.5. Parameter was set to default (0.1).")
-    sapply(stop_limit, function(x) if ( x < 0 || x > 0.5 || !is.numeric(x) ) x = 0.1 else x, simplify = TRUE)
+    stop_limit = 0.1
   }
 
   # min_perc_total range
@@ -426,55 +444,111 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_lim
   }
 
 
-
-  # binning for each x variable ------
-  x_num = 1
-  xs_len = length(xs)
-  # export the bins of all columns
-  bins = list()
-  for (i in 1:length(xs)) {
-    x_i = xs[i]
-    stop_limit_i = stop_limit[i]
-
-    # print xs
-    if ( is.character(dt[[x_i]]) || is.factor(dt[[x_i]]) || is.numeric(dt[[x_i]]) || is.logical(dt[[x_i]]) ) {
-      if (length(unique(dt[[x_i]])) > 1) {
-        if (print_step>0 & x_num %% print_step == 0) cat(paste0(format(c(x_num,xs_len)),collapse = "/"), x_i,"\n")
-      } else {
-        if (print_step>0 & x_num %% print_step == 0) cat(paste0(format(c(x_num,xs_len)),collapse = "/"), x_i, "------skiped","\n")
-        next
-      }
-    } else {
-      if (print_step>0 & x_num %% print_step == 0) cat("#",paste0(format(c(x_num,xs_len)),collapse = "/"), x_i, "------skiped","\n")
-      next
-    }
-    x_num = x_num+1
-
-
-    # woebining on one variable
-    tryCatch(
-      bins[[x_i]] <- woebin2(
-        dt[, c(x_i, y), with=FALSE], y, x_i,
-        breaks = breaks_list[[x_i]], min_perc_total=min_perc_total,
-        stop_limit=stop_limit_i, max_bin_num = max_bin_num
-      ),
-      finally = next
-    )
+  # binning for each x variable
+  # loop on xs # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
+  if (is.null(no_cores)) {
+    no_cores = ifelse(xs_len < 20, 1, detectCores())
   }
 
 
-  # bins = germancredit[, sapply(.SD, woebin2, y, breaks_list, min_perc_total, stop_limit, max_bin_num), .SDcols = xs]
+  bins = list()
+  if (no_cores == 1) {
+    for (i in 1:xs_len) {
+      x_i = xs[i]
+      # print xs
+      if (print_step>0 & i %% print_step == 0) cat(paste0(format(c(i,xs_len)),collapse = "/"), x_i,"\n")
+
+      # woebining on one variable
+      bins[[x_i]] <-
+      tryCatch(
+        woebin2(
+          y=dt[[y]], x=dt[[x_i]], x_name=x_i,
+          breaks=breaks_list[[x_i]],
+          min_perc_total=min_perc_total,
+          stop_limit=stop_limit, max_bin_num=max_bin_num
+        ),
+        error = function(e) return(paste0("The variable '", x_i, "'", " caused the error: '", e, "'"))
+      )
+    }
+
+  } else {
+    registerDoParallel(no_cores)
+    # run
+    bins <-
+      foreach(
+        i = 1:xs_len,
+        .combine = list,
+        .multicombine = TRUE,
+        .maxcombine = xs_len+1,
+        .inorder = FALSE,
+        .errorhandling = "pass",
+        .final = function(bs) {
+          if (xs_len==1) bs = list(bs)
+          setNames(bs, xs)
+        },
+        .export = c("dt", "xs", "y", "breaks_list", "min_perc_total", "stop_limit", "max_bin_num")
+      ) %dopar% {
+        x_i = xs[i]
+
+        # woebining on one variable
+        tryCatch(
+          woebin2(
+            y=dt[[y]], x=dt[[x_i]], x_name=x_i,
+            breaks=breaks_list[[x_i]], min_perc_total=min_perc_total,
+            stop_limit=stop_limit, max_bin_num=max_bin_num
+          ),
+          error = function(e) return(paste0("The variable '", x_i, "'", " caused the error: '", e, "'"))
+        )
+      }
+    # finish
+    stopImplicitCluster()
+  }
+
 
   return(bins)
 }
 
-#' Application of Binning
+
+
+
+#' @import data.table
+woepoints_ply1 = function(dtx, binx, x_i, woe_points) {
+  # woe_points: "woe" "points"
+  . = V1 = bin = woe = NULL
+
+  # binx
+  binx = binx[
+    , bin:=as.character(bin)
+  ][,.(unlist(strsplit(bin, "%,%", fixed=TRUE)),
+       eval(parse(text = woe_points)) ), by=bin]
+
+  # dtx
+  ## cut numeric variable
+  if ( is.numeric(dtx[[x_i]]) ) {
+    dtx[[x_i]] = cut(dtx[[x_i]], unique(c(-Inf, binx[bin != "missing", as.numeric(sub("^\\[(.*),.+", "\\1", bin))], Inf)), right = FALSE, dig.lab = 10, ordered_result = FALSE)
+  }
+  ## to charcarter, na to missing
+  dtx[[x_i]] = as.character(dtx[[x_i]])
+  dtx[[x_i]] = ifelse(is.na(dtx[[x_i]]), "missing", dtx[[x_i]])
+  ## add rowid column
+  dtx = setDT(dtx)[, rowid := .I]
+
+  # rename binx
+  setnames(binx, c("bin", x_i, paste(x_i, woe_points, sep="_")))
+  # merge
+  dtx_suffix = merge(setDF(dtx), setDF(binx), by=x_i, all.x = TRUE)
+  dtx_suffix = setDT(dtx_suffix)[order(rowid)][, (c("rowid", "bin", x_i)) := NULL]
+
+  return(dtx_suffix)
+}
+#' WOE Transformation
 #'
-#' \code{woebin_ply} converts original input data into woe values based on the binning information generated by \code{woebin}.
+#' \code{woebin_ply} converts original input data into woe values based on the binning information generated from \code{woebin}.
 #'
 #' @param dt A data frame.
-#' @param bins Binning information generated by \code{woebin}.
-#' @param print_step A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.
+#' @param bins Binning information generated from \code{woebin}.
+#' @param no_cores Number of CPU cores for parallel computation. Defaults NULL. If no_cores is NULL, the no_cores will set as 1 if length of x variables less than 20, and will set as the number of all CPU cores if the length of x variables greater than or equal to 20.
+#' @param print_step A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.
 #' @return Binning information
 #'
 #' @seealso  \code{\link{woebin}}, \code{\link{woebin_plot}}, \code{\link{woebin_adj}}
@@ -497,7 +571,7 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_lim
 #' # binning for germancredit dataset
 #' bins_germancredit = woebin(germancredit, y="creditability")
 #'
-#' # converting the values of germancredit into woe
+#' # converting the values in germancredit to woe
 #' # bins is a list which generated from woebin()
 #' germancredit_woe = woebin_ply(germancredit, bins_germancredit)
 #'
@@ -509,18 +583,18 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, min_perc_total=0.02, stop_lim
 #' @import data.table
 #' @export
 #'
-woebin_ply = function(dt, bins, print_step=1L) {
+woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L) {
   # global variables or functions
-  . = V1 = bin = variable = woe = NULL
+  . = V1 = bin = variable = woe = i = NULL
 
   # set dt as data.table
-  kdt = copy(setDT(dt))
+  dt = setDT(dt)
   # remove date/time col
-  kdt = rm_datetime_col(kdt)
+  dt = rm_datetime_col(dt)
   # replace "" by NA
-  kdt = rep_blank_na(kdt)
+  dt = rep_blank_na(dt)
   # ncol of dt
-  if (ncol(kdt) <=1 & !is.null(ncol(kdt))) stop("Incorrect inputs; dt should have at least two columns.")
+  if (ncol(dt) <=1 & !is.null(ncol(dt))) stop("Incorrect inputs; dt should have at least two columns.")
   # print_step
   print_step = check_print_step(print_step)
 
@@ -538,57 +612,60 @@ woebin_ply = function(dt, bins, print_step=1L) {
   xs_bin = bins[,unique(variable)]
   xs_dt = names(dt)
   xs = intersect(xs_bin, xs_dt)
-
   # loop on x variables
-  x_num = 1
   xs_len = length(xs)
-  for (a in xs) {
-    if (print_step > 0 & x_num %% print_step == 0) cat(paste0(format(c(x_num,xs_len)),collapse = "/"), a,"\n")
-    x_num = x_num+1
 
-    binsx = bins[variable==a] #bins[[a]]
-    na_woe = binsx[bin == "missing", woe]
-    binsx_narm = binsx[bin != "missing"]
+  # initial data set
+  dt_init = copy(dt)[,(xs):=NULL]
 
-    # factor or character variable
-    if (is.factor(kdt[[a]]) | is.character(kdt[[a]])) {
-      # # separate_rows
-      # # https://stackoverflow.com/questions/13773770/split-comma-separated-column-into-separate-rows
-      # binsx[, lapply(.SD, function(x) unlist(tstrsplit(x, "%,%", fixed=TRUE))), by = bstbin, .SDcols = "bin" ][copy(binsx)[,bin:=NULL], on="bstbin"]#[!is.na(bin)]
-
-      # return
-      kdt = setnames(
-        binsx[, strsplit(as.character(bin), "%,%", fixed=TRUE), by = .(bin) ][binsx[, .(bin, woe)], on="bin"][,.(V1, woe)],
-        c(a, paste0(a, "_woe"))
-      )[kdt, on=a
-      ][, (a) := NULL] #[!is.na(bin)]
-
-    # logical or numeric variables
-    } else if (is.logical(kdt[[a]]) | is.numeric(kdt[[a]])) {
-      if (is.logical(kdt[[a]])) kdt[[a]] = as.numeric(kdt[[a]]) # convert logical variable to numeric
-
-      kdt[[a]] = cut(kdt[[a]], unique(c(-Inf, binsx_narm[, as.numeric(sub("^\\[(.*),.+", "\\1", bin))], Inf)), right = FALSE, dig.lab = 10, ordered_result = FALSE)
-
-      # return
-      kdt = setnames(
-        binsx[,.(bin, woe)], c(a, paste0(a, "_woe"))
-      )[kdt, on = a
-      ][, (a) := NULL]
-
-    }
-
-    # if is.na(kdt) == na_woe
-    kdt[[paste0(a, "_woe")]] = ifelse(is.na(kdt[[paste0(a, "_woe")]]), na_woe,  kdt[[paste0(a, "_woe")]])
-
+  # loop on xs # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
+  if (is.null(no_cores)) {
+    no_cores = ifelse(xs_len < 20, 1, detectCores())
   }
 
-  return(kdt)
+  if (no_cores == 1) {
+    dat = dt_init
+    for (i in 1:xs_len) {
+      x_i = xs[i]
+      # print x
+      if (print_step > 0 & i %% print_step == 0) cat(paste0(format(c(i,xs_len)),collapse = "/"), x_i,"\n")
+
+      binx = bins[variable==x_i]
+      dtx = dt[, x_i, with=FALSE]
+
+      dat = cbind(dat, woepoints_ply1(dtx, binx, x_i, woe_points="woe"))
+    }
+  } else {
+    registerDoParallel(no_cores)
+    # run
+    dat <-
+      foreach(
+        i = 1:xs_len,
+        .combine=cbind,
+        .init = dt_init,
+        .inorder = FALSE,
+        .errorhandling = "pass",
+        .export = c("dt", "xs")
+      ) %dopar% {
+        x_i = xs[i]
+
+        binx = bins[variable==x_i]
+        dtx = dt[, x_i, with=FALSE]
+
+        woepoints_ply1(dtx, binx, x_i, woe_points="woe")
+      }
+    # finish
+    stopImplicitCluster()
+  }
+
+
+  return(dat)
 }
 
 
 # required in woebin_plot
 #' @import data.table ggplot2
-plot_bin = function(bin, title) {
+plot_bin = function(bin, title, show_iv) {
   # global variables or functions
   . = bad = badprob = badprob2 = count = count_distr = count_distr2 = count_num = good = goodbad = total_iv = value = variable = woe = NULL
 
@@ -622,6 +699,11 @@ plot_bin = function(bin, title) {
 
   # title
   if (!is.null(title)) title = paste0(title, "-")
+  if (show_iv) {
+    title_string = paste0(title, dat[1, variable],"  (iv:",bin[1,round(total_iv,4)],")")
+  } else {
+    title_string = paste0(title, dat[1, variable])
+  }
 
   # plot
   ggplot() +
@@ -631,7 +713,7 @@ plot_bin = function(bin, title) {
     geom_point(data=dat, aes(x = rowid, y=badprob2), colour = "blue", shape=21, fill="white") +
     geom_text(data=dat, aes(x = rowid, y = badprob2, label = paste0(round(badprob*100, 1), "%")), colour="blue", vjust = -0.5) +
     scale_y_continuous(limits = c(0,y_left_max), sec.axis = sec_axis(~./(y_left_max/y_right_max), name = "Bad probability")) +
-    labs(title = paste0(title, dat[1, variable],"  (iv:",bin[1,round(total_iv,4)],")"), x=NULL, y="Bin count distribution", fill=NULL) +
+    labs(title = title_string, x=NULL, y="Bin count distribution", fill=NULL) +
     theme_bw() +
     theme(
       legend.position="bottom", legend.direction="horizontal",
@@ -646,8 +728,9 @@ plot_bin = function(bin, title) {
 #'
 #' @name woebin_plot
 #' @param bins A list or data frame. Binning information generated by \code{woebin}.
-#' @param x Name of x variables. Default NULL
-#' @param title String added to the front of plot title, default NULL.
+#' @param x Name of x variables. Default is NULL. If x is NULL, then all variables except y are counted as x variables.
+#' @param title String added to the plot title. Default is NULL.
+#' @param show_iv Logical. Default is TRUE, which means show information value in the plot title.
 #' @return List of binning plot
 #'
 #' @seealso  \code{\link{woebin}}, \code{\link{woebin_ply}}, \code{\link{woebin_adj}}
@@ -678,44 +761,103 @@ plot_bin = function(bin, title) {
 #' @import data.table ggplot2
 #' @export
 #'
-woebin_plot = function(bins, x=NULL, title=NULL) {
+woebin_plot = function(bins, x=NULL, title=NULL, show_iv = TRUE) {
   # global variables or functions
   variable = NULL
+  xs = x
+
 
   # converting data.frame into list
-  bins_list = list()
-  if (is.data.frame(bins)) {
-    bins_dt = setDT(bins)
-    x = bins_dt[1, unique(variable)]
-
-    bins = list()
-    for (i in x) {
-      bins[[i]] = bins_dt[variable == i]
+  # bins # if (is.list(bins)) rbindlist(bins)
+  if (!is.data.table(bins)) {
+    if (is.data.frame(bins)) {
+      bins = setDT(bins)
+    } else {
+      bins = rbindlist(bins)
     }
-
-    # bins = eval(parse(text = paste0("list(", setDT(bins)[1, variable], " = bins)")))
   }
+
   # x variable names
-  if (is.null(x) || anyNA(x)) x = names(bins)
+  if (is.null(xs)) xs = bins[,unique(variable)]
+
 
   # plot export
   plotlist = list()
-  for (i in x) plotlist[[i]] = plot_bin(bins[[i]], title)
+  for (i in xs) plotlist[[i]] = plot_bin(bins[variable==i], title, show_iv)
 
 
   return(plotlist)
 }
 
 
+
+# print basic information in woebin_adj
+woebin_adj_print = function(i, xs_len, x_i, bins, dt, bins_breakslist) {
+  variable = x_breaks = NULL
+
+  bin = bins[variable==x_i]
+
+  cat("--------", paste0(i, "/", xs_len), x_i, "--------\n")
+  ## class
+  cat(paste0("> class(",x_i,"): "),"\n",class(dt[[x_i]]),"\n","\n")
+  ## summary
+  cat(paste0("> summary(",x_i,"): "),"\n")
+  print(summary(dt[[x_i]]))
+  cat("\n")
+  ## table
+  if (length(table(dt[[x_i]])) < 10) {
+    cat(paste0("> table(",x_i,"): "))
+    print(table(dt[[x_i]]))
+    cat("\n")
+  } else {
+    if ( is.numeric(dt[[x_i]])) {
+      ht = hist(dt[[x_i]], plot = FALSE)
+      plot(ht, main = x_i, xlab = NULL)
+    }
+  }
+  ## current breaks
+  breaks_bin = bins_breakslist[variable == x_i, x_breaks]
+
+  cat("> Current breaks: \n", breaks_bin,"\n \n")
+  ## woebin plotting
+  plist = woebin_plot(bin)
+  print(plist[[1]])
+
+}
+# plot adjusted binning in woebin_adj
+woebin_adj_break_plot = function(dt, y, x_i, breaks, stop_limit) {
+  bin_adj = NULL
+
+  text_woebin = paste0("bin_adj=woebin(dt[,c(\"",x_i,"\",\"",y,"\"),with=F], \"",y,"\", breaks_list=list(",x_i,"=c(",breaks,")), ", ifelse(stop_limit=="N","stop_limit = \"N\", ",NULL), "print_step=0L)")
+
+  eval(parse(text = text_woebin))
+
+
+  ## print adjust breaks
+  breaks_bin = setdiff(sub("^\\[(.*),.+", "\\1", bin_adj[[1]]$bin), c("-Inf","Inf","missing"))
+  breaks_bin = ifelse(
+    is.numeric(dt[[x_i]]),
+    paste0(breaks_bin, collapse=", "),
+    paste0(paste0("\"",breaks_bin,"\""), collapse=", "))
+  cat("> Current breaks: ","\n",breaks_bin,"\n","\n")
+
+  # print bin_adj
+  print(woebin_plot(bin_adj)[[1]])
+
+  # # breaks
+  if (breaks == "" || is.null(breaks)) breaks = breaks_bin
+
+  return(breaks)
+}
 #' WOE Binning Adjustment
 #'
 #' \code{woebin_adj} interactively adjust the binning breaks.
 #'
-#' @param bins A list or data frame. Binning information generated by \code{woebin}.
 #' @param dt A data frame.
 #' @param y Name of y variable.
-#' @param all_var Logical, default FALSE. It means whether to adjust all variables' binning breaks.
-#' @param count_distr_limit The count_distr limit to adjust binning breaks, default 0.05.
+#' @param bins A list or data frame. Binning information generated from \code{woebin}.
+#' @param all_var Logical, default is TRUE. If it is TRUE, the variables that need to adjust breaks include all variables, otherwise, include the variables that number distribution rate less then count_distr_limit or more then one inflection point.
+#' @param count_distr_limit The count_distr limit to adjust binning breaks. Default 0.05.
 #'
 #' @seealso  \code{\link{woebin}}, \code{\link{woebin_ply}}, \code{\link{woebin_plot}}
 #'
@@ -727,13 +869,13 @@ woebin_plot = function(bins, x=NULL, title=NULL) {
 #' # Example I
 #' dt = germancredit[, c("creditability", "age.in.years", "credit.amount")]
 #' bins = woebin(dt, y="creditability")
-#' breaks_adj = woebin_adj(bins, dt, y="creditability")
+#' breaks_adj = woebin_adj(dt, y="creditability", bins)
 #' bins_final = woebin(dt, y="creditability",
 #'                     breaks_list=breaks_adj)
 #'
 #' # Example II
 #' binsII = woebin(germancredit, y="creditability")
-#' breaks_adjII = woebin_adj(binsII, germancredit, "creditability")
+#' breaks_adjII = woebin_adj(germancredit, "creditability", binsII)
 #' bins_finalII = woebin(germancredit, y="creditability",
 #'                     breaks_list=breaks_adjII)
 #' }
@@ -743,9 +885,9 @@ woebin_plot = function(bins, x=NULL, title=NULL) {
 #' @importFrom graphics hist plot
 #' @export
 #'
-woebin_adj = function(bins, dt, y, all_var = FALSE, count_distr_limit = 0.05) {
+woebin_adj = function(dt, y, bins, all_var = TRUE, count_distr_limit = 0.05) {
   # global variables or functions
-  . = V1 = badprob = badprob2 = bin2 = bin_adj = count_distr = variable = x_breaks = x_class = NULL
+  . = V1 = badprob = badprob2 = bin2 = bin = bin_adj = count_distr = variable = x_breaks = x_class = NULL
 
   dt = setDT(dt)
   # bins # if (is.list(bins)) rbindlist(bins)
@@ -757,90 +899,60 @@ woebin_adj = function(bins, dt, y, all_var = FALSE, count_distr_limit = 0.05) {
     }
   }
 
-  # function woebin adj plotting
-  show_binadj_plot = function(dt, y, x, breaks, stop_limit) {
-    text_woebin = paste0("bin_adj=woebin(dt[,c(\"",x,"\",\"",y,"\"),with=F], \"",y,"\", breaks_list=list(",x,"=c(",breaks,")), ", ifelse(stop_limit=="N","stop_limit = \"N\", ",NULL), "print_step=0L)")
-
-    eval(parse(text = text_woebin))
-
-
-    ## print adjust breaks
-    breaks_bin = setdiff(sub("^\\[(.*),.+", "\\1", bin_adj[[1]]$bin), c("-Inf","Inf","missing"))
-    breaks_bin = ifelse(
-      is.numeric(dt[[x]]),
-      paste0(breaks_bin, collapse=", "),
-      paste0(paste0("\"",breaks_bin,"\""), collapse=", "))
-    cat("> Current breaks: ","\n",breaks_bin,"\n","\n")
-
-    # print bin_adj
-    print(woebin_plot(bin_adj)[[1]])
-
-    # # breaks
-    if (breaks == "" || is.null(breaks)) breaks = breaks_bin
-
-    return(breaks)
+  # x variables
+  xs_all = bins[,unique(variable)]
+  if (all_var == FALSE) {
+    xs_adj = union(
+      bins[bin != "missing"][count_distr < count_distr_limit, unique(variable)],
+      bins[bin != "missing"][, badprob2 := badprob >= shift(badprob, type = "lag"), by="variable"][!is.na(badprob2), length(unique(badprob2)), by="variable"][V1 > 1, variable]
+    )
+  } else {
+    xs_adj = xs_all
   }
+  # length of adjusting variables
+  xs_len = length(xs_adj)
 
   # class of variables
-  vars_class = dt[,sapply(.SD, class), .SDcols = bins[,unique(variable)]]
-  vars_class = data.table(variable = names(vars_class), x_class = vars_class)
+  vars_class = data.table(
+    variable = xs_all,
+    x_class = dt[,sapply(.SD, class), .SDcols = xs_all]
+  )
   # breakslist of bins
   bins_breakslist = bins[
     , bin2 := sub("^\\[(.*),.+", "\\1", bin)
     ][!(bin2 %in% c("-Inf","Inf","missing"))
     ][vars_class, on="variable"
-    ][, .(x_breaks = paste(ifelse(x_class == "numeric", bin2, paste0("\"", bin2, "\"")), collapse = ", ")), by=variable]
+    ][, .(
+      x_breaks = paste(ifelse(x_class == "numeric", bin2, paste0("\"", bin2, "\"")), collapse = ", "),
+      x_class=unique(x_class)), by=variable]
 
-  # x variables
-  if (all_var == FALSE) {
-    xs = union(
-      bins[count_distr < count_distr_limit, unique(variable)],
-      bins[bin != "missing"][, badprob2 := badprob >= shift(badprob, type = "lag"), by="variable"][!is.na(badprob2), length(unique(badprob2)), by="variable"][V1 > 1, variable]
-    )
-  } else {
-    xs = bins[,unique(variable)]
+
+  # loop on adjusting variables
+  if (xs_len == 0) {
+    warning("The binning breaks of all variables are perfect according to default settings.")
+
+    breaks_list = paste0(bins_breakslist[, paste0(variable, "=c(", x_breaks, ")")], collapse = ", \n ")
+    breaks_list = paste0(c("list(", breaks_list, ")"), collapse = "\n ")
+
+    return(breaks_list)
   }
 
-  xs_len = length(xs)
+
   i = 1
   breaks_list = NULL
   while (i <= xs_len) {
-    # gn = readline(paste0("> Go to nth Var (e.g.: g4,Go 4th): "))
-
     # x variable
-    x = xs[i]
-    cat("--------", paste0(i, "/", xs_len), x, "--------\n")
-    bin = bins[variable==x]
     breaks = stop_limit = NULL
+    x_i = xs_adj[i]
 
-    # basic information of x variable ------
-    ## class
-    cat(paste0("> class(",x,"): "),"\n",class(dt[[x]]),"\n","\n")
-    ## summary
-    cat(paste0("> summary(",x,"): "),"\n")
-    print(summary(dt[[x]]))
-    cat("\n")
-    ## table
-    if (length(table(dt[[x]])) < 10) {
-      cat(paste0("> table(",x,"): "))
-      print(table(dt[[x]]))
-      cat("\n")
-    } else {
-      if ( is.numeric(dt[[x]])) {
-        ht = hist(dt[[x]], plot = FALSE)
-        plot(ht, main = x, xlab = NULL)
-      }
-    }
-    ## current breaks
-    breaks_bin = bins_breakslist[variable == x, x_breaks]
-
-    cat("> Current breaks: ","\n", breaks_bin,"\n","\n")
-    ## woebin plotting
-    plist = woebin_plot(bin)
-    print(plist[[1]])
+    # basic information of x_i variable ------
+    woebin_adj_print(i, xs_len, x_i, bins, dt, bins_breakslist)
 
     # adjusting breaks ------
-    while (menu(c("No", "Yes"), title=paste0("> Adjust breaks for (", i, "/", xs_len, ") ", x, "?")) == 2) {
+    adj_brk = menu(c("next", "yes", "back"), title=paste0("> Adjust breaks for (", i, "/", xs_len, ") ", x_i, "?"))
+
+    while (adj_brk == 2) {
+      # modify breaks adj_brk == 2
       breaks = readline("> Enter modified breaks: ")
       breaks = gsub("^[,\\.]+|[,\\.]+$", "", breaks)
       if (breaks == "N") {
@@ -850,18 +962,23 @@ woebin_adj = function(bins, dt, y, all_var = FALSE, count_distr_limit = 0.05) {
         stop_limit = NULL
       }
 
-      tryCatch(breaks <- show_binadj_plot(dt, y, x, breaks, stop_limit), finally=next)
+      tryCatch(breaks <- woebin_adj_break_plot(dt, y, x_i, breaks, stop_limit), error = function(e) e)
+
+      adj_brk = menu(c("next", "yes", "back"), title=paste0("> Adjust breaks for (", i, "/", xs_len, ") ", x_i, "?"))
     }
 
-
-    if (!(is.null(breaks) || breaks == "")) bins_breakslist[variable == x][["x_breaks"]]  <- breaks
+    if (adj_brk == 3) {
+      # go back adj_brk == 3
+      i = ifelse(i > 1, i-1, i)
+    } else {
+      # go next adj_brk == 1
+      if (!(is.null(breaks) || breaks == "")) bins_breakslist[variable == x_i][["x_breaks"]]  <- breaks
     i = i + 1
+    }
   }
-
 
   breaks_list = paste0(bins_breakslist[, paste0(variable, "=c(", x_breaks, ")")], collapse = ", \n ")
   breaks_list = paste0(c("list(", breaks_list, ")"), collapse = "\n ")
-
 
   cat(breaks_list,"\n")
   return(breaks_list)

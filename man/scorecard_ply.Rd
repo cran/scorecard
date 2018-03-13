@@ -2,7 +2,7 @@
 % Please edit documentation in R/scorecard.R
 \name{scorecard_ply}
 \alias{scorecard_ply}
-\title{Application of Scorecard}
+\title{Score Transformation}
 \usage{
 scorecard_ply(dt, card, only_total_score = TRUE, print_step = 1L)
 }
@@ -11,50 +11,43 @@ scorecard_ply(dt, card, only_total_score = TRUE, print_step = 1L)
 
 \item{card}{Scorecard generated from \code{scorecard}.}
 
-\item{only_total_score}{A logical value. Default is TRUE, which means only total credit score is return. Otherwise, if it is FALSE, which means both total credit score and score points of each variables are return.}
+\item{only_total_score}{Logical, default is TRUE. If it is TRUE, then the output includes only total credit score; Otherwise, if it is FALSE, the output includes both total and each variable's credit score.}
 
-\item{print_step}{A non-negative integer. Default is 1. Print variable names by print_step when print_step>0. If print_step=0, no message is printed.}
+\item{print_step}{A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0, no message is print.}
 }
 \value{
 Credit score
 }
 \description{
-\code{scorecard_ply} calculates credit score using the results of \code{scorecard}.
+\code{scorecard_ply} calculates credit score using the results from \code{scorecard}.
 }
 \examples{
-library(data.table)
-library(scorecard)
-
+\dontrun{
 # load germancredit data
 data("germancredit")
 
-# select only 5 x variables and rename creditability as y
-dt = setDT(germancredit)[, c(1:5, 21)][, `:=`(
-  y = ifelse(creditability == "bad", 1, 0),
-  creditability = NULL
-)]
+# filter variable via missing rate, iv, identical value rate
+dt_sel = var_filter(germancredit, "creditability")
 
 # woe binning ------
-bins = woebin(dt, "y")
-dt_woe = woebin_ply(dt, bins)
+bins = woebin(dt_sel, "creditability")
+dt_woe = woebin_ply(dt_sel, bins)
 
 # glm ------
-m = glm( y ~ ., family = "binomial", data = dt_woe)
+m = glm(creditability ~ ., family = "binomial", data = dt_woe)
 # summary(m)
 
-\dontrun{
 # Select a formula-based model by AIC
 m_step = step(m, direction="both", trace=FALSE)
 m = eval(m_step$call)
 # summary(m)
 
 # predicted proability
-# dt_woe$pred = predict(m, type='response', dt_woe)
+# dt_pred = predict(m, type='response', dt_woe)
 
 # performace
 # ks & roc plot
-# perf_eva(dt_woe$y, dt_woe$pred)
-}
+# perf_eva(dt_woe$creditability, dt_pred)
 
 # scorecard
 # Example I # creat a scorecard
@@ -64,7 +57,6 @@ card = scorecard(bins, m)
 # Example I # only total score
 score1 = scorecard_ply(dt, card)
 
-\dontrun{
 # Example II # credit score for both total and each variable
 score2 = scorecard_ply(dt, card, only_total_score = F)
 }

@@ -4,25 +4,26 @@
 \alias{perf_eva}
 \title{KS, ROC, Lift, PR}
 \usage{
-perf_eva(label, pred, title = "performance", groupnum = 20, type = c("ks",
-  "roc"), show_plot = TRUE, positive = "bad|1", seed = 186)
+perf_eva(label, pred, title = "performance", groupnum = NULL,
+  type = c("ks", "roc"), show_plot = TRUE, positive = "bad|1",
+  seed = 186)
 }
 \arguments{
 \item{label}{Label values, such as 0s and 1s, 0 represent for good and 1 for bad.}
 
 \item{pred}{Predicted probability or score.}
 
-\item{title}{Title of plot, default "performance".}
+\item{title}{Title of plot, default is "performance".}
 
-\item{groupnum}{The group numbers when calculating bad probability, default 20.}
+\item{groupnum}{The group number when calculating KS.  Default NULL, which means the number of sample size.}
 
 \item{type}{Types of performance plot, such as "ks", "lift", "roc", "pr". Default c("ks", "roc").}
 
-\item{show_plot}{Logical value, default TRUE. It means whether to show plot.}
+\item{show_plot}{Logical value, default is TRUE. It means whether to show plot.}
 
-\item{positive}{Value of positive class, default "bad|1".}
+\item{positive}{Value of positive class, default is "bad|1".}
 
-\item{seed}{An integer. The specify seed is used for random sorting data, default: 186.}
+\item{seed}{Integer, default is 186. The specify seed is used for random sorting data.}
 }
 \value{
 ks, roc, lift, pr
@@ -32,25 +33,18 @@ ks, roc, lift, pr
 }
 \examples{
 \dontrun{
-library(data.table)
-library(scorecard)
-
-# Traditional Credit Scoring Using Logistic Regression
 # load germancredit data
 data("germancredit")
 
-# rename creditability as y
-dt = data.table(germancredit)[, `:=`(
-  y = ifelse(creditability == "bad", 1, 0),
-  creditability = NULL
-)]
+# filter variable via missing rate, iv, identical value rate
+dt_sel = var_filter(germancredit, "creditability")
 
 # woe binning ------
-bins = woebin(dt, "y")
-dt_woe = woebin_ply(dt, bins)
+bins = woebin(dt_sel, "creditability")
+dt_woe = woebin_ply(dt_sel, bins)
 
 # glm ------
-m1 = glm( y ~ ., family = "binomial", data = dt_woe)
+m1 = glm( creditability ~ ., family = "binomial", data = dt_woe)
 # summary(m1)
 
 # Select a formula-based model by AIC
@@ -63,13 +57,13 @@ dt_pred = predict(m2, type='response', dt_woe)
 
 # performance ------
 # Example I # only ks & auc values
-perf_eva(dt_woe$y, dt_pred, show_plot=FALSE)
+perf_eva(dt_woe$creditability, dt_pred, show_plot=FALSE)
 
 # Example II # ks & roc plot
-perf_eva(dt_woe$y, dt_pred)
+perf_eva(dt_woe$creditability, dt_pred)
 
 # Example III # ks, lift, roc & pr plot
-perf_eva(dt_woe$y, dt_pred, type = c("ks","lift","roc","pr"))
+perf_eva(dt_woe$creditability, dt_pred, type = c("ks","lift","roc","pr"))
 }
 }
 \seealso{

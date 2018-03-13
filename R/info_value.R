@@ -4,9 +4,9 @@
 #'
 #' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
 #' @param y Name of y variable.
-#' @param x Name of x variables. Default NULL If x is NULL, all variables exclude y will counted as x variables.
-#' @param positive Value of positive class, default "bad|1".
-#' @param order Logical. If it is TRUE, return descending sorted iv values.
+#' @param x Name of x variables. Default is NULL. If x is NULL, then all variables except y are counted as x variables.
+#' @param positive Value of positive class, default is "bad|1".
+#' @param order Logical, default is TRUE. If it is TRUE, the output will descending order via iv.
 #'
 #' @return Information Value
 #' @details IV is a very useful concept for variable selection while developing credit scorecards. The formula for information value is shown below: \deqn{IV = \sum(DistributionBad_{i} - DistributionGood_{i})*\ln(\frac{DistributionBad_{i}}{DistributionGood_{i}}).} The log component in information value is defined as weight of evidence (WOE), which is shown as \deqn{WeightofEvidence = \ln(\frac{DistributionBad_{i}}{DistributionGood_{i}}).} The relationship between information value and predictive power is as follows: <0.02 (useless for prediction), 0.02 to 0.1 (Weak predictor), 0.1 to 0.3 (Medium predictor), 0.3 to 0.5 (Strong predictor) and >0.5 (Suspicious or too good to be true).
@@ -16,13 +16,13 @@
 #' data(germancredit)
 #'
 #' # information values
-#' dt_infovalue = iv(germancredit, y = "creditability")
+#' dt_info_value = iv(germancredit, y = "creditability")
 #'
 #' @import data.table
 #' @export
 #'
-iv = function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
-  good = bad = DistrBad = DistrGood = miv = info_value = . = NULL # no visible binding for global variable
+iv = function(dt, y, x=NULL, positive="bad|1", order=TRUE) {
+  info_value = label = NULL # no visible binding for global variable
 
   # set dt as data.table
   dt = setDT(dt)
@@ -33,33 +33,33 @@ iv = function(dt, y, x=NULL, positive="bad|1", order="TRUE") {
   # check y
   dt = check_y(dt, y, positive)
   # x variable names
-  x = x_variable(dt,y,x)
+  x = x_variable(dt, y, x)
 
   # data prep
   dt = dt[
     , x, with = FALSE
-    ][, `:=`(
-      rowid = .I,
-      y = ifelse(grepl(positive, dt[[y]]), 1, 0)
-    )]
+  ][, `:=`(
+    rowid = .I, label = dt[[y]]
+  )]
 
   # info_value
-  ivlist = melt(
-    setDT(dt)[, (x) := lapply(.SD, as.character), .SDcols = x],
-    id = c("rowid", "y")
-  )[
-    , .(good = sum(y==0), bad = sum(y==1), count=.N), keyby=c("variable", "value")
+  ivlist = dt[, sapply(.SD, iv_xy, label), .SDcols = x]
+
+  ivlist = data.table(variable=names(ivlist), info_value=ivlist)
+  if (order) ivlist = ivlist[order(-info_value)]
+
+  return(ivlist)
+}
+#' @import data.table
+iv_xy = function(x, y) {
+  . = DistrBad = DistrGood = bad = good = NULL
+
+  data.table(x=x, y=y)[
+    , .(good = sum(y==0), bad = sum(y==1)), keyby="x"
     ][, (c("good", "bad")) := lapply(.SD, function(x) ifelse(x==0, 0.99, x)), .SDcols = c("good", "bad")# replace 0 by 0.99 in good/bad columns
-    ][, `:=`(DistrGood = good/sum(good), DistrBad = bad/sum(bad) ), by="variable"
-    ][, miv := (DistrBad-DistrGood)*log(DistrBad/DistrGood)
-    ][, .(info_value = sum(miv)), by="variable"]
-
-
-  if (order==TRUE) {
-    return( ivlist[order(-info_value)] )
-  } else {
-    return( ivlist )
-  }
+    ][, `:=`(
+      DistrGood = good/sum(good), DistrBad = bad/sum(bad)
+   )][, sum((DistrBad-DistrGood)*log(DistrBad/DistrGood)) ]
 
 }
 

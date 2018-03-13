@@ -1,25 +1,25 @@
-#' renamed as perf_eva
-#'
-#' The function perf_plot has renamed as perf_eva.
-#'
-#' @param label Label values, such as 0s and 1s, 0 represent for good and 1 for bad.
-#' @param pred Predicted probability values.
-#' @param title Title of plot, default "train".
-#' @param groupnum The group numbers when calculating bad probability, default 20.
-#' @param type Types of performance plot, such as "ks", "lift", "roc", "pr". Default c("ks", "roc").
-#' @param show_plot Logical value, default TRUE. It means whether to show plot.
-#' @param seed An integer. The specify seed is used for random sorting data, default: 186.
-#'
-#' @export
-perf_plot = function(label, pred, title="train", groupnum=20, type=c("ks", "roc"), show_plot=TRUE, seed=186) {stop("This function has renamed as perf_eva.")}
+# renamed as perf_eva
+#
+# The function perf_plot has renamed as perf_eva.
+#
+# @param label Label values, such as 0s and 1s, 0 represent for good and 1 for bad.
+# @param pred Predicted probability values.
+# @param title Title of plot, default "train".
+# @param groupnum The group number when calculating bad probability, default NULL.
+# @param type Types of performance plot, such as "ks", "lift", "roc", "pr". Default c("ks", "roc").
+# @param show_plot Logical value, default TRUE. It means whether to show plot.
+# @param seed An integer. The specify seed is used for random sorting data, default: 186.
+perf_plot = function(label, pred, title=NULL, groupnum=NULL, type=c("ks", "roc"), show_plot=TRUE, seed=186) {
+  stop("This function has renamed as perf_eva.")
+}
 
 
 
-eva_dfkslift = function(df, groupnum = 20) {
+eva_dfkslift = function(df, groupnum = NULL) {
   # global variables
   pred=group=.=label=good=bad=ks=cumbad=cumgood=NULL
 
-  if (groupnum == "N") groupnum = nrow(df)
+  if (is.null(groupnum)) groupnum = nrow(df)
 
   df_kslift = df[
     order(-pred)
@@ -64,14 +64,15 @@ eva_plift = function(dfkslift) {
   badrate_avg = dfkslift[,sum(bad)/sum(good+bad)]
 
   plift = ggplot( dfkslift[-1][,.(group, cumbadrate, badrate)], aes(x=group) ) +
-    geom_bar(aes(y=badrate), stat = "identity", fill=NA, colour = "black") +
-    geom_line(aes(y=cumbadrate)) + geom_point(aes(y=cumbadrate), shape=21, fill="white") +
+    # geom_line(aes(y=badrate), stat = "identity", fill=NA, colour = "black") +
+    geom_line(aes(y=cumbadrate)) +
+    # geom_point(aes(y=cumbadrate), shape=21, fill="white") +
     coord_fixed() +
     geom_segment(aes(x = 0, y = badrate_avg, xend = 1, yend = badrate_avg), colour = "red", linetype = "dashed") +
     labs(x="% of population", y="% of Bad") +
     annotate("text", x=0.50,y=Inf, label="Lift", vjust=1.5, size=6)+
-    annotate("text", x=0.75,y=mean(dfkslift$cumbadrate), label="cumulate", vjust=1)+
-    annotate("text", x=0.75,y=badrate_avg, label="sample", vjust=1, colour="red")+
+    annotate("text", x=0.75,y=mean(dfkslift$cumbadrate), label="cumulate badrate", vjust=1)+
+    annotate("text", x=0.75,y=badrate_avg, label="average badrate", vjust=1, colour="red")+
     guides(fill=guide_legend(title=NULL)) +
     scale_fill_manual(values=c("white", "grey")) +
     scale_x_continuous(expand = c(0, 0), limits = c(0, 1)) +
@@ -133,36 +134,29 @@ eva_ppr = function(dfrocpr) {
 #' @name perf_eva
 #' @param label Label values, such as 0s and 1s, 0 represent for good and 1 for bad.
 #' @param pred Predicted probability or score.
-#' @param title Title of plot, default "performance".
-#' @param groupnum The group numbers when calculating bad probability, default 20.
+#' @param title Title of plot, default is "performance".
+#' @param groupnum The group number when calculating KS.  Default NULL, which means the number of sample size.
 #' @param type Types of performance plot, such as "ks", "lift", "roc", "pr". Default c("ks", "roc").
-#' @param show_plot Logical value, default TRUE. It means whether to show plot.
-#' @param positive Value of positive class, default "bad|1".
-#' @param seed An integer. The specify seed is used for random sorting data, default: 186.
+#' @param show_plot Logical value, default is TRUE. It means whether to show plot.
+#' @param positive Value of positive class, default is "bad|1".
+#' @param seed Integer, default is 186. The specify seed is used for random sorting data.
 #' @return ks, roc, lift, pr
 #' @seealso \code{\link{perf_psi}}
 #'
 #' @examples
 #' \dontrun{
-#' library(data.table)
-#' library(scorecard)
-#'
-#' # Traditional Credit Scoring Using Logistic Regression
 #' # load germancredit data
 #' data("germancredit")
 #'
-#' # rename creditability as y
-#' dt = data.table(germancredit)[, `:=`(
-#'   y = ifelse(creditability == "bad", 1, 0),
-#'   creditability = NULL
-#' )]
+#' # filter variable via missing rate, iv, identical value rate
+#' dt_sel = var_filter(germancredit, "creditability")
 #'
 #' # woe binning ------
-#' bins = woebin(dt, "y")
-#' dt_woe = woebin_ply(dt, bins)
+#' bins = woebin(dt_sel, "creditability")
+#' dt_woe = woebin_ply(dt_sel, bins)
 #'
 #' # glm ------
-#' m1 = glm( y ~ ., family = "binomial", data = dt_woe)
+#' m1 = glm( creditability ~ ., family = "binomial", data = dt_woe)
 #' # summary(m1)
 #'
 #' # Select a formula-based model by AIC
@@ -175,18 +169,18 @@ eva_ppr = function(dfrocpr) {
 #'
 #' # performance ------
 #' # Example I # only ks & auc values
-#' perf_eva(dt_woe$y, dt_pred, show_plot=FALSE)
+#' perf_eva(dt_woe$creditability, dt_pred, show_plot=FALSE)
 #'
 #' # Example II # ks & roc plot
-#' perf_eva(dt_woe$y, dt_pred)
+#' perf_eva(dt_woe$creditability, dt_pred)
 #'
 #' # Example III # ks, lift, roc & pr plot
-#' perf_eva(dt_woe$y, dt_pred, type = c("ks","lift","roc","pr"))
+#' perf_eva(dt_woe$creditability, dt_pred, type = c("ks","lift","roc","pr"))
 #' }
 #' @import data.table ggplot2 gridExtra
 #' @export
 #'
-perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", "roc"), show_plot=TRUE, positive="bad|1", seed=186) {
+perf_eva = function(label, pred, title="performance", groupnum=NULL, type=c("ks", "roc"), show_plot=TRUE, positive="bad|1", seed=186) {
   # global variables
   FPR = TPR = cumbad = group = ks = NULL
 
@@ -306,49 +300,44 @@ perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", 
 
 #' PSI
 #'
-#' \code{perf_psi} calculates population stability index (PSI) based on provided credit score and provides plot of credit score distribution.
+#' \code{perf_psi} calculates population stability index (PSI) and provides credit score distribution based on credit score datasets.
 #'
-#' @param score A list of credit score for actual and expected data samples. For example, score = list(train = score_A, test = score_E), both score_A and score_E are dataframes with the same column names.
-#' @param label A list of label values for actual and expected data samples. For example, label = list(train = label_A, test = label_E), both label_A and label_E are vectors or dataframes. The label values should be 0s and 1s, 0 represent for good and 1 for bad.
-#' @param title Title of plot, default "".
-#' @param x_limits x-axis limits, default c(0, 800).
-#' @param x_tick_break x-axis ticker break, default 100.
-#' @param show_plot Logical value, default TRUE. It means whether to show plot.
-#' @param return_distr_dat Logical, default FALSE.
-#' @param seed An integer. The specify seed is used for random sorting data, default 186.
+#' @param score A list of credit score for actual and expected data samples. For example, score = list(actual = score_A, expect = score_E), both score_A and score_E are dataframes with the same column names.
+#' @param label A list of label value for actual and expected data samples. The default is NULL. For example, label = list(actual = label_A, expect = label_E), both label_A and label_E are vectors or dataframes. The label values should be 0s and 1s, 0 represent for good and 1 for bad.
+#' @param title Title of plot, default is NULL.
+#' @param x_limits x-axis limits, default is c(100, 800).
+#' @param x_tick_break x-axis ticker break, default is 50.
+#' @param show_plot Logical, default is TRUE. It means whether to show plot.
+#' @param return_distr_dat Logical, default is FALSE.
+#' @param seed Integer, default is 186. The specify seed is used for random sorting data.
 #'
 #' @return a dataframe of psi & plots of credit score distribution
+#'
 #' @details The population stability index (PSI) formula is displayed below: \deqn{PSI = \sum((Actual\% - Expected\%)*(\ln(\frac{Actual\%}{Expected\%}))).} The rule of thumb for the PSI is as follows: Less than 0.1 inference insignificant change, no action required; 0.1 - 0.25 inference some minor change, check other scorecard monitoring metrics; Greater than 0.25 inference major shift in population, need to delve deeper.
 #'
 #' @seealso \code{\link{perf_eva}}
 #'
 #' @examples
 #' \dontrun{
-#' library(data.table)
-#' library(scorecard)
-#'
 #' # load germancredit data
 #' data("germancredit")
 #'
-#' # rename creditability as y
-#' dt = data.table(germancredit)[, `:=`(
-#'   y = ifelse(creditability == "bad", 1, 0),
-#'   creditability = NULL
-#' )]
+#' # filter variable via missing rate, iv, identical value rate
+#' dt_sel = var_filter(germancredit, "creditability")
 #'
 #' # breaking dt into train and test ------
-#' dt_list = split_df(dt, "y", ratio = 0.6, seed=21)
+#' dt_list = split_df(dt_sel, "creditability", ratio = 0.6, seed=21)
 #' dt_train = dt_list$train; dt_test = dt_list$test
 #'
 #' # woe binning ------
-#' bins = woebin(dt_train, "y")
+#' bins = woebin(dt_train, "creditability")
 #'
 #' # converting train and test into woe values
 #' train = woebin_ply(dt_train, bins)
 #' test = woebin_ply(dt_test, bins)
 #'
 #' # glm ------
-#' m1 = glm( y ~ ., family = "binomial", data = train)
+#' m1 = glm(creditability ~ ., family = "binomial", data = train)
 #' # summary(m1)
 #'
 #' # Select a formula-based model by AIC
@@ -361,8 +350,8 @@ perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", 
 #' test_pred = predict(m2, type='response', test)
 #'
 #' # # ks & roc plot
-#' # perf_eva(train$y, train_pred, title = "train")
-#' # perf_eva(train$y, train_pred, title = "test")
+#' # perf_eva(train$creditability, train_pred, title = "train")
+#' # perf_eva(test$creditability, test_pred, title = "test")
 #'
 #' #' # scorecard
 #' card = scorecard(bins, m2)
@@ -374,7 +363,7 @@ perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", 
 #' # Example I # psi
 #' psi = perf_psi(
 #'   score = list(train = train_score, test = test_score),
-#'   label = list(train = train$y, test = test$y)
+#'   label = list(train = train$creditability, test = test$creditability)
 #' )
 #' # psi$psi  # psi dataframe
 #' # psi$pic  # pic of score distribution
@@ -382,7 +371,7 @@ perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", 
 #' # Example II # specifying score range
 #' psi_s = perf_psi(
 #'   score = list(train = train_score, test = test_score),
-#'   label = list(train = train$y, test = test$y),
+#'   label = list(train = train$creditability, test = test$creditability),
 #'   x_limits = c(200, 750),
 #'   x_tick_break = 50
 #'   )
@@ -394,7 +383,7 @@ perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", 
 #' # psi
 #' psi2 = perf_psi(
 #'   score = list(train = train_score2, test = test_score2),
-#'   label = list(train = train$y, test = test$y)
+#'   label = list(train = train$creditability, test = test$creditability)
 #' )
 #' # psi2$psi  # psi dataframe
 #' # psi2$pic  # pic of score distribution
@@ -402,7 +391,7 @@ perf_eva = function(label, pred, title="performance", groupnum=20, type=c("ks", 
 #' @import data.table ggplot2 gridExtra
 #' @export
 #'
-perf_psi = function(score, label = NULL, title="", x_limits=c(100,800), x_tick_break=50, show_plot=TRUE, seed=186, return_distr_dat = FALSE) {
+perf_psi = function(score, label=NULL, title=NULL, x_limits=c(100,800), x_tick_break=50, show_plot=TRUE, seed=186, return_distr_dat = FALSE) {
   # psi = sum((Actual% - Expected%)*ln(Actual%/Expected%))
 
   # global variables
@@ -457,7 +446,7 @@ perf_psi = function(score, label = NULL, title="", x_limits=c(100,800), x_tick_b
   # score dataframe column names
   score_names = names(score[[1]])
 
-  # merge score label into one dataframe
+  # dataframe with score & label
   for (i in names(score)) {
     if (!is.null(label)) {
       score[[i]]$y = label[[i]]
@@ -552,7 +541,7 @@ perf_psi = function(score, label = NULL, title="", x_limits=c(100,800), x_tick_b
         theme(plot.title=element_text(vjust = -2.5), legend.position=c(1,1), legend.justification=c(1,1), legend.background=element_blank())
 
 
-      if (title != "" & !is.na(title)) {
+      if (!is.null(title)) {
         p_score_distr = p_score_distr + ggtitle(paste0(title, " PSI: ", round(psi(dat), 4)))
       } else {
         p_score_distr = p_score_distr + ggtitle(paste0(sn, "_PSI: ", round(psi(dat), 4)))
