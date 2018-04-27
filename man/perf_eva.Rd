@@ -4,16 +4,15 @@
 \alias{perf_eva}
 \title{KS, ROC, Lift, PR}
 \usage{
-perf_eva(label, pred, title = "performance", groupnum = NULL,
-  type = c("ks", "roc"), show_plot = TRUE, positive = "bad|1",
-  seed = 186)
+perf_eva(label, pred, title = NULL, groupnum = NULL, type = c("ks",
+  "roc"), show_plot = TRUE, positive = "bad|1", seed = 186)
 }
 \arguments{
 \item{label}{Label values, such as 0s and 1s, 0 represent for good and 1 for bad.}
 
 \item{pred}{Predicted probability or score.}
 
-\item{title}{Title of plot, default is "performance".}
+\item{title}{Title of plot, default is NULL.}
 
 \item{groupnum}{The group number when calculating KS.  Default NULL, which means the number of sample size.}
 
@@ -31,6 +30,19 @@ ks, roc, lift, pr
 \description{
 \code{perf_eva} provides performance evaluations, such as kolmogorov-smirnow(ks), ROC, lift and precision-recall curves, based on provided label and predicted probability values.
 }
+\details{
+Accuracy = true positive and true negative/total cases
+
+Error rate = false positive and false negative/total cases
+
+TPR, True Positive Rate(Recall or Sensitivity) = true positive/total actual positive
+
+PPV, Positive Predicted Value(Precision) = true positive/total predicted positive
+
+TNR, True Negative Rate(Specificity) = true negative/total actual negative
+
+NPV, Negative Predicted Value = true negative/total predicted negative
+}
 \examples{
 \dontrun{
 # load germancredit data
@@ -44,7 +56,7 @@ bins = woebin(dt_sel, "creditability")
 dt_woe = woebin_ply(dt_sel, bins)
 
 # glm ------
-m1 = glm( creditability ~ ., family = "binomial", data = dt_woe)
+m1 = glm( creditability ~ ., family = binomial(), data = dt_woe)
 # summary(m1)
 
 # Select a formula-based model by AIC
