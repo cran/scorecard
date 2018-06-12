@@ -1,8 +1,17 @@
 # conditions # https://adv-r.hadley.nz/debugging
 
-# remove date time
-rm_datetime_col = function(dt) {
+# remove date time # rm_datetime_col
+# remove columns if len(x.unique()) == 1
+rmcol_datetime_unique1 = function(dt) {
   dt = setDT(dt)
+
+  unique1_cols = names(which(dt[,sapply(.SD, function(x) length(unique(x))==1)]))
+  if (length(unique1_cols > 0)) {
+    warning(paste0("There are ", length(unique1_cols), " columns have only one unique values, which are removed from input dataset. \n (ColumnNames: ", paste0(unique1_cols, collapse=', '), ")" ))
+
+    dt = copy(dt)[, (unique1_cols) := NULL]
+  }
+
 
   isdatetime = function(x) (class(x)[1] %in% c("Date","POSIXlt","POSIXct","POSIXt")) == TRUE
   datetime_col = names(which(dt[,sapply(.SD, isdatetime)]))
@@ -131,6 +140,7 @@ check_breaks_list = function(breaks_list, xs) {
 check_special_values = function(special_values, xs) {
   if (!is.null(special_values)) {
     if (is.vector(special_values) & !is.list(special_values)) {
+      warning("The special_values should be a list. Make sure special values are exactly the same in all variables if special_values is a vector.")
       # transfer vector to list
       special_values_list = list()
       for (i in xs) {
@@ -163,3 +173,11 @@ check_special_values = function(special_values, xs) {
   return(special_values)
 }
 
+# second to hh:mm:ss
+sec_to_hms = function(sec) {
+  h = sec %/% 3600
+  m = sec %% 3600 %/% 60
+  s = floor(sec %% 3600 %% 60)
+
+  return(sprintf("%02s:%02s:%02s",h,m,s))
+}

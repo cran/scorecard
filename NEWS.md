@@ -1,3 +1,12 @@
+# scorecard 0.1.8
+
+* remove columns have only one unique values in input dataset
+* modify the default values of x_limits in perf_psi
+* fixed a bug in perf_psi when the label is factor
+* display proc time in woebin
+* fixed a bug in per_eva when estimating AUC
+* fixed a bug in woebin_adj when special_values is provided
+
 # scorecard 0.1.7
 
 * added chimerge method for woebin function

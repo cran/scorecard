@@ -101,8 +101,9 @@ eva_dfrocpr = function(df) {
 }
 eva_proc = function(dfrocpr, title) {
   # global variables
-  FPR=TPR=NULL
+  .=FPR=TPR=NULL
 
+  dfrocpr = rbind(dfrocpr[,.(FPR,TPR)], data.frame(FPR=0:1,TPR=0:1))
   auc = dfrocpr[order(FPR,TPR)][, sum(
     (TPR+shift(TPR, fill=0, type="lag"))/2*(FPR-shift(FPR, fill=0, type="lag"))
   )]
@@ -165,13 +166,13 @@ eva_pf1 = function(dfrocpr, title) {
     labs(x = "% of population", y = "F1") +
     # annotate("text", x = 0.5, y=Inf, label="F1", vjust=1.5, size=6) +
     ggtitle(paste0(title, 'F1')) +
-    annotate('text', x=0, y=0, label=paste0('pred\n',round(pred_0,4)), vjust=-0.2, hjust=0) +
-    annotate('text', x=1, y=0, label=paste0('pred\n',round(pred_1,4)), vjust=-0.2, hjust=1) +
-    annotate('text', x=dfrocpr[F1==max(F1,na.rm = TRUE),pop], y=0, label=paste0('pred\n',round(pred_F1max,4)), vjust=-0.2) +
+    annotate('text', x=0, y=0, label=paste0('pred: \n',round(pred_0,4)), vjust=-0.2, hjust=0) +
+    annotate('text', x=1, y=0, label=paste0('pred: \n',round(pred_1,4)), vjust=-0.2, hjust=1) +
+    # annotate('text', x=dfrocpr[F1==max(F1,na.rm = TRUE),pop], y=0, label=paste0('pred\n',round(pred_F1max,4)), vjust=-0.2) +
     annotate(
       'text', x=dfrocpr[F1==max(F1,na.rm = TRUE),pop],
       y=dfrocpr[F1==max(F1,na.rm = TRUE),F1],
-      label=paste0('F1 max: \n',dfrocpr[F1==max(F1,na.rm = TRUE),round(F1,4)]), vjust=-0.2, colour='blue') +
+      label=paste0('F1: ',dfrocpr[F1==max(F1,na.rm = TRUE),round(F1,4)], '\n@', round(pred_F1max,4)), vjust=-0.2, colour='blue') +
     scale_x_continuous(expand = c(0, 0), limits = c(0, 1)) +
     scale_y_continuous(expand = c(0, 0), limits = c(0, 1)) +
     theme_bw()
@@ -202,7 +203,7 @@ eva_pf1 = function(dfrocpr, title) {
 #'
 #' PPV, Positive Predicted Value(Precision) = true positive/total predicted positive
 #'
-#' TNR, True Negative Rate(Specificity) = true negative/total actual negative
+#' TNR, True Negative Rate(Specificity) = true negative/total actual negative = 1-FPR
 #'
 #' NPV, Negative Predicted Value = true negative/total predicted negative
 #'
@@ -256,9 +257,10 @@ eva_pf1 = function(dfrocpr, title) {
 #'
 perf_eva = function(label, pred, title=NULL, groupnum=NULL, type=c("ks", "roc"), show_plot=TRUE, positive="bad|1", seed=186) {
   # global variables
-  FPR = TPR = cumbad = group = ks = NULL
+  .=FPR = TPR = cumbad = group = ks = NULL
 
   # inputs checking
+  if (is.factor(label)) label = as.character(label)
   if (!(is.vector(label) & is.vector(pred) & length(label) == length(pred))) stop("Incorrect inputs; label and pred should be vectors with the same length.")
   # if pred is score
   if ( !(mean(pred, na.rm=TRUE)<=1 & mean(pred, na.rm=TRUE)>=0) ) {
@@ -300,7 +302,7 @@ perf_eva = function(label, pred, title=NULL, groupnum=NULL, type=c("ks", "roc"),
   if ("ks" %in% type) rt$KS = df_kslift[ks == max(ks)][order(group)][1,round(ks, 4)]
   # ROC ------
   if ("roc" %in% type) {
-    auc = df_rocpr[order(FPR,TPR)][, sum(
+    auc = rbind(df_rocpr[,.(FPR,TPR)], data.frame(FPR=0:1,TPR=0:1))[order(FPR,TPR)][, sum(
       (TPR+shift(TPR, fill=0, type="lag"))/2*(FPR-shift(FPR, fill=0, type="lag"))
     )]
     # return list
@@ -333,7 +335,7 @@ perf_eva = function(label, pred, title=NULL, groupnum=NULL, type=c("ks", "roc"),
 #' @param score A list of credit score for actual and expected data samples. For example, score = list(actual = score_A, expect = score_E), both score_A and score_E are dataframes with the same column names.
 #' @param label A list of label value for actual and expected data samples. The default is NULL. For example, label = list(actual = label_A, expect = label_E), both label_A and label_E are vectors or dataframes. The label values should be 0s and 1s, 0 represent for good and 1 for bad.
 #' @param title Title of plot, default is NULL.
-#' @param x_limits x-axis limits, default is c(100, 800).
+#' @param x_limits x-axis limits, default is NULL.
 #' @param x_tick_break x-axis ticker break, default is 50.
 #' @param show_plot Logical, default is TRUE. It means whether to show plot.
 #' @param return_distr_dat Logical, default is FALSE.
@@ -419,7 +421,7 @@ perf_eva = function(label, pred, title=NULL, groupnum=NULL, type=c("ks", "roc"),
 #' @import data.table ggplot2 gridExtra
 #' @export
 #'
-perf_psi = function(score, label=NULL, title=NULL, x_limits=c(100,800), x_tick_break=50, show_plot=TRUE, seed=186, return_distr_dat = FALSE) {
+perf_psi = function(score, label=NULL, title=NULL, x_limits=NULL, x_tick_break=50, show_plot=TRUE, seed=186, return_distr_dat = FALSE) {
   # psi = sum((Actual% - Expected%)*ln(Actual%/Expected%))
 
   # global variables
@@ -513,10 +515,14 @@ perf_psi = function(score, label=NULL, title=NULL, x_limits=c(100,800), x_tick_b
   for ( sn in score_names ) {
     # data manipulation to calculating psi and plot
     if (length(unique(dt_sl[[sn]])) > 10) {
+      if (is.null(x_limits)) {
+        x_limits = quantile(dt_sl[[sn]], probs=c(0.02,0.98))
+        x_limits = round(x_limits/x_tick_break)*x_tick_break
+      }
       # breakpoints
       brkp = unique(c(
         floor(min(dt_sl[[sn]])/x_tick_break)*x_tick_break,
-        seq(x_limits[1]+x_tick_break, x_limits[2]-x_tick_break, by=x_tick_break),
+        seq(x_limits[1], x_limits[2], by=x_tick_break),
         ceiling(max(dt_sl[[sn]])/x_tick_break)*x_tick_break
       ))
 
