@@ -319,7 +319,7 @@ perf_eva = function(label, pred, title=NULL, groupnum=NULL, type=c("ks", "roc"),
   if (show_plot == TRUE) {
     plist = paste0(paste0('p',type,"=eva_p", type, '(df_',type,',title)'), collapse = ',')
     plist = eval(parse(text=paste0("list(",plist,")")))
-    p_nrows = floor(length(type)/2)
+    p_nrows = ceiling(length(type)/2)
 
     args.list <- c(plist, list(nrow=p_nrows, padding = 0))
     rt$pic = do.call(grid.arrange, args.list)
@@ -494,11 +494,9 @@ perf_psi = function(score, label=NULL, title=NULL, x_limits=NULL, x_tick_break=5
 
     # dataframe of bin, actual, expected
     dt_bae = dcast(
-      dat[,.(count=.N), keyby=c("ae", "bin")
-        ],#[,distr := count/sum(count), by="ae"][],
+      dat[,.(count=as.numeric(.N)), keyby=c("ae", "bin")],
       bin ~ ae, value.var="count", fill = 0.9
     )
-    # dt_bae[dt_bae == 0] = 0.9 # replace 0 by 0.9
 
     names_ae = setdiff(names(dt_bae), "bin")
     psi_dt = dt_bae[
@@ -516,7 +514,7 @@ perf_psi = function(score, label=NULL, title=NULL, x_limits=NULL, x_tick_break=5
     # data manipulation to calculating psi and plot
     if (length(unique(dt_sl[[sn]])) > 10) {
       if (is.null(x_limits)) {
-        x_limits = quantile(dt_sl[[sn]], probs=c(0.02,0.98))
+        x_limits = quantile(dt_sl[[sn]], probs=c(0.02,0.98), na.rm = TRUE)
         x_limits = round(x_limits/x_tick_break)*x_tick_break
       }
       # breakpoints

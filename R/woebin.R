@@ -50,6 +50,27 @@ dtm_binning_sv = function(dtm, breaks, spl_val) {
   return(list(binning_sv=binning_sv, dtm=dtm))
 }
 
+# check empty bins for unmeric variable
+check_empty_bins = function(dtm, binning) {
+  . = bin = value = variable = y = NULL
+  # check empty bins
+  ## break points from bin
+  breaks_list = lapply(
+    list(left="\\1", right="\\2"),
+    function(x) setdiff(sub("^\\[(.*), *(.*)\\)", x, unique(binning$bin)), c("Inf","-Inf")) )
+  ## if there are empty bins
+  if (!setequal(breaks_list$left, breaks_list$right)) {
+    bstbrks = unique(c(-Inf, unique(breaks_list$right), Inf))
+    binning = dtm[
+      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)
+    ][, .(good = sum(y==0), bad = sum(y==1), variable=unique(variable)) , by = .(bin)
+    ][order(bin)]
+
+    # warning( paste0("The break points are modified into \'", paste0(breaks_list$right, collapse = ", "), "\'. There are empty bins based on the provided break points." ) )
+  }
+  return(binning)
+}
+
 # required in woebin2 # return binning if breaks provided
 #' @import data.table
 woebin2_breaks = function(dtm, breaks, spl_val) {
@@ -71,25 +92,12 @@ woebin2_breaks = function(dtm, breaks, spl_val) {
     bstbrks = c(-Inf, setdiff(unique(bk_df$value), c(NA, Inf, -Inf)), Inf)
 
     binning = dtm[
-      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)]
-
+      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)
+    ][, .(good = sum(y==0), bad = sum(y==1), variable=unique(variable)) , by = .(bin)
+    ][order(bin)]
     # check empty bins
-    ## break points from bin
-    breaks_list = lapply(
-      list(left="\\1", right="\\2"),
-      function(x) setdiff(sub("^\\[(.*), *(.*)\\)", x, unique(binning$bin)), c("Inf","-Inf")) )
-    ## if there are empty bins
-    if (!setequal(breaks_list$left, breaks_list$right)) {
-      bstbrks = unique(c(-Inf, unique(breaks_list$right), Inf))
-      binning = dtm[
-        , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)]
+    binning = check_empty_bins(dtm, binning)
 
-      warning( paste0("The break points are modified into \'", paste0(breaks_list$right, collapse = ", "), "\'. There are empty bins based on the provided break points." ) )
-    }
-
-
-    binning = binning[, .(good = sum(y==0), bad = sum(y==1), variable=unique(variable)) , by = .(bin)
-      ][order(bin)]
 
     # merge binning with bk_df
     if (bk_df[is.na(value),.N] == 1) {
@@ -159,16 +167,20 @@ woebin2_init_bin = function(dtm, min_perc_fine_bin, breaks, spl_val) {
     } else {
       brk = pretty(xvalue_rm_outlier, n)
     }
-    brk = sort(brk)
-    brk = unique(c(-Inf, brk[2:length(brk)], Inf))
+    brk = sort(brk[(brk < max(xvalue, na.rm =TRUE)) & (brk > min(xvalue, na.rm =TRUE))])
+    brk = unique(c(-Inf, brk, Inf))
     if (anyNA(xvalue)) brk = c(brk, NA)
 
     # initial binning datatable
     init_bin = dtm[
       , bin := cut(value, brk, right = FALSE, dig.lab = 10, ordered_result = FALSE)
     ][, .(good = sum(y==0), bad = sum(y==1), variable=unique(variable)) , by = bin
-    ][order(bin)
-    ][, `:=`(brkp = as.numeric( sub("^\\[(.*),.+", "\\1", bin)), badprob = bad/(good+bad))
+    ][order(bin)]
+    # check empty bins
+    init_bin = check_empty_bins(dtm, init_bin)
+
+    init_bin = init_bin[
+      , `:=`(brkp = as.numeric( sub("^\\[(.*),.+", "\\1", bin)), badprob = bad/(good+bad))
     ][, .(variable, bin, brkp, good, bad, badprob)]
 
   } else if ( is.logical(dtm[,value]) || is.factor(dtm[,value]) || is.character(dtm[,value]) ) {
@@ -394,8 +406,8 @@ woebin2_chimerge = function(dtm, min_perc_fine_bin=0.02, min_perc_coarse_bin=0.0
     a_colsum = a+a_lag,
     a_sum = sum(a+a_lag)), by=brkp
   ][, `:=`(
-    e = a_rowsum*a_colsum/a_sum,
-    e_lag = a_lag_rowsum*a_colsum/a_sum
+    e = a_rowsum/a_sum*a_colsum,
+    e_lag = a_lag_rowsum/a_sum*a_colsum
   )][, .(chisq=sum((a-e)^2/e + (a_lag-e_lag)^2/e_lag)), by=brkp]
 
   return(merge(initial_binning[,count:=good+bad], chisq_df, all.x = TRUE))
@@ -432,7 +444,6 @@ woebin2_chimerge = function(dtm, min_perc_fine_bin=0.02, min_perc_coarse_bin=0.0
       rm_brkp = binning_chisq[, merge_tolead := FALSE][order(chisq, count)][1,]
 
     }
-
 
     # groupby brkp
     shift_type = ifelse(rm_brkp[1,merge_tolead], 'lead', 'lag')
@@ -483,12 +494,10 @@ binning_format = function(binning) {
 
 # woebin2
 # This function provides woe binning for only two columns (one x and one y) dataframe.
-woebin2 = function(y, x, x_name, breaks=NULL, spl_val=NULL,  min_perc_fine_bin=0.02, min_perc_coarse_bin=0.05, stop_limit=0.1, max_num_bin=8, method="tree") {
+woebin2 = function(dtm, breaks=NULL, spl_val=NULL, min_perc_fine_bin=0.02, min_perc_coarse_bin=0.05, stop_limit=0.1, max_num_bin=8, method="tree") {
   # global variables or functions
   . = bad = badprob = bin = bin_iv = good = total_iv = variable = woe = is_sv = NULL
 
-  # melt data.table
-  dtm = data.table(y=y, variable=x_name, value=x)
 
   # binning
   if (!anyNA(breaks) & !is.null(breaks)) {
@@ -551,9 +560,17 @@ woebin2 = function(y, x, x_name, breaks=NULL, spl_val=NULL,  min_perc_fine_bin=0
 #'
 #' # Example I
 #' # binning of two variables in germancredit dataset
-#' bins_2var = woebin(germancredit, y = "creditability", x = c("credit.amount", "purpose"))
+#' # using tree method
+#' bins2_tree = woebin(germancredit, y="creditability",
+#'    x=c("credit.amount","housing"), method="tree")
+#' bins2_tree
+#'
 #'
 #' \dontrun{
+#' # using chimerge method
+#' bins2_chi = woebin(germancredit, y="creditability",
+#'    x=c("credit.amount","housing"), method="chimerge")
+#'
 #' # Example II
 #' # binning of the germancredit dataset
 #' bins_germ = woebin(germancredit, y = "creditability")
@@ -667,18 +684,15 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, special_values=NULL, min_perc
 
       # woebining on one variable
       bins[[x_i]] <-
-      tryCatch(
-        woebin2(
-          y=dt[[y]], x=dt[[x_i]], x_name=x_i,
+        try(do.call(woebin2, args = list(
+          dtm = data.table(y=dt[[y]], variable=x_i, value=dt[[x_i]]),
           breaks=breaks_list[[x_i]],
           spl_val=special_values[[x_i]],
           min_perc_fine_bin=min_perc_fine_bin,
           min_perc_coarse_bin=min_perc_coarse_bin,
           stop_limit=stop_limit, max_num_bin=max_num_bin,
           method=method
-        ),
-        error = function(e) return(paste0("The variable '", x_i, "'", " caused the error: '", e, "'"))
-      )
+        )), silent = TRUE)
     }
 
   } else {
@@ -701,18 +715,15 @@ woebin = function(dt, y, x=NULL, breaks_list=NULL, special_values=NULL, min_perc
         x_i = xs[i]
 
         # woebining on one variable
-        tryCatch(
-          woebin2(
-            y=dt[[y]], x=dt[[x_i]], x_name=x_i,
-            breaks=breaks_list[[x_i]],
-            spl_val=special_values[[x_i]],
-            min_perc_fine_bin=min_perc_fine_bin,
-            min_perc_coarse_bin=min_perc_coarse_bin,
-            stop_limit=stop_limit, max_num_bin=max_num_bin,
-            method=method
-          ),
-          error = function(e) return(paste0("The variable '", x_i, "'", " caused the error: '", e, "'"))
-        )
+        try(do.call(woebin2, args = list(
+          dtm = data.table(y=dt[[y]], variable=x_i, value=dt[[x_i]]),
+          breaks=breaks_list[[x_i]],
+          spl_val=special_values[[x_i]],
+          min_perc_fine_bin=min_perc_fine_bin,
+          min_perc_coarse_bin=min_perc_coarse_bin,
+          stop_limit=stop_limit, max_num_bin=max_num_bin,
+          method=method
+        )), silent = TRUE)
       }
     # finish
     stopImplicitCluster()
@@ -790,6 +801,7 @@ woepoints_ply1 = function(dtx, binx, x_i, woe_points) {
 #'
 #' # converting original value to woe
 #' dt_woe = woebin_ply(dt, bins=bins)
+#' str(dt_woe)
 #'
 #' \dontrun{
 #' # Example II
@@ -971,15 +983,16 @@ plot_bin = function(bin, title, show_iv) {
 #' data(germancredit)
 #'
 #' # Example I
-#' dt1 = germancredit[, c("creditability", "credit.amount")]
+#' bins1 = woebin(germancredit, y="creditability", x="credit.amount")
 #'
-#' bins1 = woebin(dt1, y="creditability")
 #' p1 = woebin_plot(bins1)
+#' print(p1)
 #'
 #' \dontrun{
 #' # Example II
 #' bins = woebin(germancredit, y="creditability")
 #' plotlist = woebin_plot(bins)
+#' print(plotlist$credit.amount)
 #'
 #' # # save binning plot
 #' # for (i in 1:length(plotlist)) {

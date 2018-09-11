@@ -12,12 +12,15 @@
 #' (numeric and factors) and 1000 observations.
 #' @source \url{https://archive.ics.uci.edu/ml/datasets/Statlog+(German+Credit+Data)}
 #' @examples
-#' # Load German credit data and create subset
+#' # load German credit data
 #' data(germancredit)
-#' df = germancredit[, c('creditability', 'credit.amount', 'duration.in.month',
-#'                   'savings.account.and.bonds', 'purpose')]
-#' # Display structure of the subset (data frame)
-#' str(df)
+#'
+#' # structure of germancredit
+#' str(germancredit)
+#'
+#' # summary of germancredit
+#' lapply(germancredit, summary)
+#'
 NULL
 
 # the dataset is modified from woebinning package

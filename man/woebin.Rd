@@ -5,9 +5,9 @@
 \title{WOE Binning}
 \usage{
 woebin(dt, y, x = NULL, breaks_list = NULL, special_values = NULL,
-  min_perc_fine_bin = 0.02, min_perc_coarse_bin = 0.05, stop_limit = 0.1,
-  max_num_bin = 8, positive = "bad|1", no_cores = NULL, print_step = 0L,
-  method = "tree")
+  min_perc_fine_bin = 0.02, min_perc_coarse_bin = 0.05,
+  stop_limit = 0.1, max_num_bin = 8, positive = "bad|1",
+  no_cores = NULL, print_step = 0L, method = "tree")
 }
 \arguments{
 \item{dt}{A data frame with both x (predictor/feature) and y (response/label) variables.}
@@ -48,9 +48,17 @@ data(germancredit)
 
 # Example I
 # binning of two variables in germancredit dataset
-bins_2var = woebin(germancredit, y = "creditability", x = c("credit.amount", "purpose"))
+# using tree method
+bins2_tree = woebin(germancredit, y="creditability",
+   x=c("credit.amount","housing"), method="tree")
+bins2_tree
+
 
 \dontrun{
+# using chimerge method
+bins2_chi = woebin(germancredit, y="creditability",
+   x=c("credit.amount","housing"), method="chimerge")
+
 # Example II
 # binning of the germancredit dataset
 bins_germ = woebin(germancredit, y = "creditability")

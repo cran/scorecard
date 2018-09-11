@@ -26,15 +26,16 @@ List of binning plot
 data(germancredit)
 
 # Example I
-dt1 = germancredit[, c("creditability", "credit.amount")]
+bins1 = woebin(germancredit, y="creditability", x="credit.amount")
 
-bins1 = woebin(dt1, y="creditability")
 p1 = woebin_plot(bins1)
+print(p1)
 
 \dontrun{
 # Example II
 bins = woebin(germancredit, y="creditability")
 plotlist = woebin_plot(bins)
+print(plotlist$credit.amount)
 
 # # save binning plot
 # for (i in 1:length(plotlist)) {

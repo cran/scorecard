@@ -1,24 +1,31 @@
 Package: scorecard
-Type: Package
+Version: 0.1.9
 Title: Credit Risk Scorecard
-Description: Makes the development of credit risk scorecard easily and efficiently by providing functions such as information value, variable filter, optimal woe binning, scorecard scaling and performance evaluation etc. The references including: 
-  1. Refaat, M. (2011, ISBN: 9781447511199). Credit Risk Scorecard: Development and Implementation Using SAS. 
-  2. Siddiqi, N. (2006, ISBN: 9780471754510). Credit risk scorecards. Developing and Implementing Intelligent Credit Scoring.
-Version: 0.1.8
-Author: Shichen Xie
-Maintainer: Shichen Xie <xie@shichen.name>
+Description: 
+  The `scorecard` package makes the development of credit risk scorecard 
+  easier and efficient by providing functions, such as information 
+  value, variable filter, optimal woe binning, scorecard scaling and 
+  performance evaluation etc. 
+    The references including: 
+  1. Refaat, M. (2011, ISBN: 9781447511199). Credit Risk Scorecard: 
+  Development and Implementation Using SAS. 
+  2. Siddiqi, N. (2006, ISBN: 9780471754510). Credit risk scorecards. 
+  Developing and Implementing Intelligent Credit Scoring.
+Authors@R: person("Shichen", "Xie", , "xie@shichen.name", c("aut", "cre"))
 Depends: R (>= 3.1.0)
 Imports: data.table (>= 1.10.0), ggplot2, gridExtra, foreach,
         doParallel, parallel
+Suggests: knitr, rmarkdown, pkgdown
+License: MIT + file LICENSE
 URL: https://github.com/ShichenXie/scorecard
 BugReports: https://github.com/ShichenXie/scorecard/issues
-License: MIT + file LICENSE
-Encoding: UTF-8
 LazyData: true
-RoxygenNote: 6.0.1
-Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
+RoxygenNote: 6.1.0
+Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2018-06-12 14:35:07 UTC; shichenxie
+Packaged: 2018-09-11 01:33:12 UTC; shichenxie
+Author: Shichen Xie [aut, cre]
+Maintainer: Shichen Xie <xie@shichen.name>
 Repository: CRAN
-Date/Publication: 2018-06-12 15:08:12 UTC
+Date/Publication: 2018-09-11 05:30:02 UTC
