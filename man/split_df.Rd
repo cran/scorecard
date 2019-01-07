@@ -4,7 +4,7 @@
 \alias{split_df}
 \title{Split a dataset}
 \usage{
-split_df(dt, y = NULL, ratio = 0.7, seed = 186)
+split_df(dt, y = NULL, ratio = 0.7, seed = 618)
 }
 \arguments{
 \item{dt}{A data frame.}
@@ -13,10 +13,13 @@ split_df(dt, y = NULL, ratio = 0.7, seed = 186)
 
 \item{ratio}{A numeric value, default is 0.7. It indicates the ratio of total rows contained in one split, must less than 1.}
 
-\item{seed}{A random seed, default is 186.}
+\item{seed}{A random seed, default is 618.}
+}
+\value{
+A list of dataframes
 }
 \description{
-Split a dataset
+Split a dataset into train and test
 }
 \examples{
 # load German credit data

@@ -1,9 +1,13 @@
 #' Split a dataset
 #'
+#' Split a dataset into train and test
+#'
 #' @param dt A data frame.
 #' @param y Name of y variable, default is NULL. The input data will split based on the predictor y, if it is provide.
 #' @param ratio A numeric value, default is 0.7. It indicates the ratio of total rows contained in one split, must less than 1.
-#' @param seed A random seed, default is 186.
+#' @param seed A random seed, default is 618.
+#'
+#' @return A list of dataframes
 #'
 #' @examples
 #' # load German credit data
@@ -24,13 +28,13 @@
 #'
 #' @import data.table
 #' @export
-split_df = function(dt, y=NULL, ratio=0.7, seed=186) {
+split_df = function(dt, y=NULL, ratio=0.7, seed=618) {
   ind = NULL
 
   # set dt as data.table
   dt = setDT(dt)
   # remove date/time col
-  dt = rmcol_datetime_unique1(dt)
+  # dt = rmcol_datetime_unique1(dt)
   # replace "" by NA
   dt = rep_blank_na(dt)
 

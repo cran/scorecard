@@ -1,49 +1,62 @@
-# conditions # https://adv-r.hadley.nz/debugging
+# condition & helper functions # https://adv-r.hadley.nz/debugging
 
-# remove date time # rm_datetime_col
-# remove columns if len(x.unique()) == 1
-rmcol_datetime_unique1 = function(dt) {
-  dt = setDT(dt)
+# ceiling on decimal
+ceiling2 = function(x) {
+  x_sci = format(x, scientific = TRUE, digits=2)
+  z = ceiling(as.numeric(substr(x_sci, 1, 3)))
+  e = substr(x_sci, 4, nchar(x_sci))
+  as.numeric(paste0(z, e))
+}
 
-  # character columns with too many unique values
-  char_cols = names(which(dt[, sapply(.SD, function(x) is.character(x) | is.factor(x))]))
-  char_cols_too_many_unique = names(which(dt[, sapply(.SD, function(x) length(unique(x))), .SDcols = char_cols] >= 50))
+# is date/time class
+isdatetime = function(x) {
+  any(class(x) %in% c("Date","POSIXlt","POSIXct","POSIXt"))
+}
 
-  if (length(char_cols_too_many_unique) > 0) {
-    # warning()
-    if (menu(c("yes", "no"), title = paste0("There are ",length(char_cols_too_many_unique), " variables have too many unique character/factor values, which might cause the binning process slow. Please double check the following variables: \n", paste0(char_cols_too_many_unique, collapse = ", "), "\n\nContinue the binning process?")) == 2) stop()
+
+# remove constant columns
+check_const_cols = function(dt) {
+  setDT(dt)
+  # constant columns
+  const_cols = names(which(dt[,sapply(.SD, function(x) length(unique(x))==1)]))
+  if (length(const_cols) > 0) {
+    warning( sprintf('There are %s constant columns are removed from input dataset,\n%s', length(const_cols), paste0(const_cols, collapse=', ')) )
+    dt = dt[, (const_cols) := NULL]
   }
-
-  # columns with only one unique values
-  unique1_cols = names(which(dt[,sapply(.SD, function(x) length(unique(x))==1)]))
-  if (length(unique1_cols > 0)) {
-    warning(paste0("There are ", length(unique1_cols), " columns have only one unique values, which are removed from input dataset. \n (ColumnNames: ", paste0(unique1_cols, collapse=', '), ")" ))
-
-    dt = copy(dt)[, (unique1_cols) := NULL]
-  }
-
-
-  # remove datatime columns
-  isdatetime = function(x) (class(x)[1] %in% c("Date","POSIXlt","POSIXct","POSIXt")) == TRUE
-  datetime_col = names(which(dt[,sapply(.SD, isdatetime)]))
-
-  if (length(datetime_col) > 0) {
-    warning(paste0("The date/times columns (",paste0(datetime_col,collapse = ","),") are removed from input dataset."))
-
-    dt = copy(dt)[,(datetime_col) := NULL]
-  }
-
   return(dt)
+}
+# remove date time columns
+check_datetime_cols = function(dt) {
+  setDT(dt)
+  # datatime columns
+  datetime_cols = names(which(dt[,sapply(.SD, isdatetime)]))
+  if (length(datetime_cols) > 0) {
+    warning( sprintf('There are %s date/time columns are removed from input dataset,\n%s', length(datetime_cols), paste0(datetime_cols, collapse=', ')) )
+    dt = dt[,(datetime_cols) := NULL]
+  }
+  return(dt)
+}
+# check categorical columns' unique values
+check_cateCols_uniqueValues = function(dt) {
+  setDT(dt)
+  # categorical columns
+  cate_cols = names(which(dt[, sapply(.SD, function(x) is.character(x) | is.factor(x))]))
+  if (length(cate_cols) > 0) {
+    # have more than 50 unique values
+    cateCols_uniVal50 = names(which(dt[, sapply(.SD, function(x) length(unique(x)) > 50), .SDcols = cate_cols]))
+    # double check
+    if (length(cateCols_uniVal50) > 0) {
+      if (menu(c('yes','no'), title = sprintf('There are %s categorical columns have more than 50 unique values, which might cause the binning process slow. Please double check the following columns:\n%s \n\nContinue the binning process?', length(cateCols_uniVal50), paste0(cateCols_uniVal50, collapse = ", "))) == 2 ) stop()
+    }
+  }
 }
 
 # replace blank by NA
-#' @import data.table
-#'
 rep_blank_na = function(dt) {
   dt = setDT(dt)
 
   if (any(dt == "", na.rm = TRUE)) {
-    warning("There are blank characters in the columns of \"", paste0(names(which(dt[,sapply(.SD, function(x) any(x=="",na.rm = T))])), collapse = ",") ,"\", which were replaced by NAs.")
+    warning(sprintf('The blank characters are replaced with NAs, which are located in columns of \n%s', paste(names(which(dt[,sapply(.SD, function(x) any(x=="",na.rm = T))])), collapse = ", ")))
 
     dt[dt == ""] = NA
   }
@@ -52,48 +65,49 @@ rep_blank_na = function(dt) {
 }
 
 # check y
-#' @import data.table
-#'
-check_y = function(dt, y, positive){
+check_y = function(dt, y, positive) {
   dt = setDT(dt)
+  positive = as.character(positive)
+  # dt[[y]]  = as.character(dt[[y]])
 
-  # ncol of dt
+  # number of columns >= 2
   if (ncol(dt) <=1 & !is.null(ncol(dt))) stop("Incorrect inputs; dt should have at least two columns.")
-
-  # y ------
-  if (!(y %in% names(dt))) stop(paste0("Incorrect inputs; there is no \"", y, "\" column in dt."))
-
   # length of y == 1
   if (length(y) != 1) stop("Incorrect inputs; the length of \"",y,"\" != 1.")
+  # exist of y column
+  if (!(y %in% names(dt))) stop(paste0("Incorrect inputs; there is no \"", y, "\" column in dt."))
 
-  # remove na in y
-  if ( anyNA(dt[[y]]) ) {
-    warning(paste0("There are NAs in ", y, ". The rows with NA in \"", y, "\" were removed from input data."))
-    y_sel = !is.na(dt[[y]]); dt = dt[y_sel]
+  # remove rows have missing values in y
+  if (dt[, anyNA(get(y))]) {
+    warning(sprintf("There are NAs in %s. The rows with NAs in \"%s\" are removed from input data.", y, y))
+    dt = dt[!is.na(get(y))]
   }
 
- # length of unique values in y
-  if (length(unique(dt[[y]])) == 2) {
-    if ( any(c(0,1) %in% unique(dt[[y]]) == FALSE) ) {
+  # numeric to integer
+  if (dt[,class(get(y)) == 'numeric']) dt[, (y) := as.integer(get(y))]
+  # factor to character
+  if (dt[,class(get(y)) == 'factor' ]) dt[, (y) := as.character(get(y))]
 
-      if (any(grepl(positive, dt[[y]])==TRUE)) {
-        warning(paste0("The positive value in \"", y,"\" was replaced by 1 and negative value by 0."))
-        dt[[y]] = ifelse(grepl(positive, dt[[y]]), 1, 0)
-      } else {
-        stop(paste0("Incorrect inputs; the positive value in \"", y, "\" is not specified"))
+  # length of unique values in y
+  if (dt[, length(unique(get(y))) == 2]) {
+    if (dt[, any(grepl(positive, get(y)))]) {
+      y1 = dt[,get(y)]
+      y2 = ifelse(grepl(positive, y1), 1L, 0L)
+      if (any(y1 != y2)) {
+        dt[[y]] = y2
+        # warning(paste0("The positive value in \"", y, "\" was replaced by 1 and negative value by 0."))
       }
-
+    } else {
+      stop(paste0("Incorrect inputs; the positive value in \"", y, "\" is not specified"))
     }
   } else {
-    stop(paste0("Incorrect inputs; the length of unique values in \"",y , "\" != 2."))
+    stop(paste0("Incorrect inputs; the length of unique values in \"", y, "\" != 2."))
   }
 
   return(dt)
 }
 
 # check print_step
-#' @import data.table
-#'
 check_print_step = function(print_step) {
   if (!is.numeric(print_step) || print_step<0) {
     warning("Incorrect inputs; print_step should be a non-negative integer. It was set to 1L.")
@@ -110,7 +124,7 @@ x_variable = function(dt, y, x) {
   if (is.null(x)) x = x_all
 
   if ( length(setdiff(x,x_all)) > 0 ) {
-    warning(paste0("Incorrect inputs; the variables \n\"", paste0(setdiff(x,x_all), collapse = ","), "\"\n are not exist in input data, which are removed."))
+    warning(sprintf('Incorrect inputs; there are %s variables are not exist in the input dataframe, which are removed from x. \n%s', length(setdiff(x, x_all)), paste(setdiff(x, x_all), collapse = ', ')) )
     x = intersect(x, x_all)
   }
 
@@ -190,8 +204,25 @@ sec_to_hms = function(sec) {
   m = sec %% 3600 %/% 60
   s = floor(sec %% 3600 %% 60)
 
-  return(sprintf("%02s:%02s:%02s",h,m,s))
+  return(sprintf("%02.f:%02.f:%02.f",h,m,s))
 }
 
 
 
+# y to good bad
+# groupby or dcast
+# groupby is faster via data.table package
+y_to_goodbad = function(dt, y) {
+  # dt = data.table(x = rnorm(1e+8), y = sample(c(rep(0,9),1), 1e+8, replace = TRUE))
+  #
+  # system.time(
+  #   dcast(dt, x~y, fun=length, value.var = 'y')
+  # )
+  #
+  # system.time(
+  #   dt[, .(good=sum(y==0), bad=sum(y==1)), by=x]
+  # )
+
+
+
+}

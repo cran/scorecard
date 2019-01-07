@@ -1,5 +1,5 @@
 # coefficients in scorecard
-ab = function(points0=600, odds0=1/60, pdo=50) {
+ab = function(points0=600, odds0=1/19, pdo=50) {
   # sigmoid function
   # library(ggplot2)
   # ggplot(data.frame(x = c(-5, 5)), aes(x)) + stat_function(fun = function(x) 1/(1+exp(-x)))
@@ -20,11 +20,7 @@ ab = function(points0=600, odds0=1/60, pdo=50) {
   # points0 = a - b*log(odds0)
   # points0 - PDO = a - b*log(2*odds0)
 
-  if ((sign(pdo)) == 1) {
-    b = pdo/log(2)
-  } else {
-    b = -pdo/log(2)
-  }
+  b = pdo/log(2)
   a = points0 + b*log(odds0) #log(odds0/(1+odds0))
 
   return(list(a=a, b=b))
@@ -39,9 +35,9 @@ ab = function(points0=600, odds0=1/60, pdo=50) {
 #' @param odds0 Target odds, default 1/19. Odds = p/(1-p).
 #' @param pdo Points to Double the Odds, default 50.
 #' @param basepoints_eq0 Logical, default is FALSE. If it is TRUE, the basepoints will equally distribute to each variable.
-#' @return scorecard
+#' @return A scorecard dataframe
 #'
-#' @seealso \code{\link{scorecard_ply}}
+#' @seealso \code{\link{scorecard2}} \code{\link{scorecard_ply}}
 #'
 #' @examples
 #' \dontrun{
@@ -74,6 +70,12 @@ ab = function(points0=600, odds0=1/60, pdo=50) {
 #' # scorecard
 #' # Example I # creat a scorecard
 #' card = scorecard(bins, m)
+#' card2 = scorecard2(bins=bins, dt=germancredit, y='creditability',
+#'   x=c("status.of.existing.checking.account", "duration.in.month", "credit.history",
+#'    "purpose", "credit.amount", "savings.account.and.bonds",
+#'    "present.employment.since", "installment.rate.in.percentage.of.disposable.income",
+#'    "personal.status.and.sex", "other.debtors.or.guarantors", "property",
+#'    "age.in.years", "other.installment.plans", "housing"))
 #'
 #' # credit score
 #' # Example I # only total score
@@ -84,7 +86,6 @@ ab = function(points0=600, odds0=1/60, pdo=50) {
 #' }
 #' @import data.table
 #' @export
-#'
 scorecard = function(bins, model, points0=600, odds0=1/19, pdo=50, basepoints_eq0=FALSE) {
   # global variables or functions
   variable = var_woe = Estimate = points = woe = NULL
@@ -105,45 +106,46 @@ scorecard = function(bins, model, points0=600, odds0=1/19, pdo=50, basepoints_eq
   }
 
   # coefficients
-  coef = data.frame(summary(model)$coefficients)
-  coef$variable = row.names(coef)
-  coef = setnames(setDT(coef)[,c(1,5),with=FALSE], c("Estimate", "var_woe"))[, variable := gsub("_woe$", "", var_woe) ][]
-
+  coef_dt = data.table(var_woe = names(coef(model)), Estimate = coef(model))[, variable := sub("_woe$", "", var_woe) ][]
 
   # scorecard
-  len_x = coef[-1,.N]
-  basepoints = a - b*coef[1,Estimate]
-  card = list()
+  basepoints = a - b*coef_dt[1,Estimate]
 
+  card = list()
   if (basepoints_eq0) {
     card[["basepoints"]] = data.table( variable = "basepoints", bin = NA, woe = NA, points = 0 )
 
-    for (i in coef[-1,variable]) {
-      card[[i]] = bins[variable==i][, points := round(-b*coef[variable==i, Estimate]*woe + basepoints/len_x)]
+    for (i in coef_dt[-1,variable]) {
+      card[[i]] = bins[variable==i][, points := round(-b*coef_dt[variable==i, Estimate]*woe + basepoints/coef_dt[,.N-1])]
     }
   } else {
     card[["basepoints"]] = data.table( variable = "basepoints", bin = NA, woe = NA, points = round(basepoints) )
 
-    for (i in coef[-1,variable]) {
-      card[[i]] = bins[variable==i][, points := round(-b*coef[variable==i, Estimate]*woe)]
+    for (i in coef_dt[-1,variable]) {
+      card[[i]] = bins[variable==i][, points := round(-b*coef_dt[variable==i, Estimate]*woe)]
     }
   }
 
   return(card)
 }
 
-
-#' Score Transformation
+#' Creating a Scorecard
 #'
-#' \code{scorecard_ply} calculates credit score using the results from \code{scorecard}.
+#' \code{scorecard} creates a scorecard based on the results from \code{woebin} and \code{glm}.
 #'
-#' @param dt Original data
-#' @param card Scorecard generated from \code{scorecard}.
-#' @param only_total_score  Logical, default is TRUE. If it is TRUE, then the output includes only total credit score; Otherwise, if it is FALSE, the output includes both total and each variable's credit score.
-#' @param print_step A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0, no message is print.
-#' @return Credit score
+#' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
+#' @param y Name of y variable.
+#' @param x Name of x variables. If it is NULL, then all variables in bins are used. Default is NULL.
+#' @param bins Binning information generated from \code{woebin} function.
+#' @param points0 Target points, default 600.
+#' @param odds0 Target odds, default 1/19. Odds = p/(1-p).
+#' @param pdo Points to Double the Odds, default 50.
+#' @param basepoints_eq0 Logical, default is FALSE. If it is TRUE, the basepoints will equally distribute to each variable.
+#' @param positive Value of positive class, default "bad|1".
+#' @param ... Additional parameters.
+#' @return A scorecard dataframe
 #'
-#' @seealso \code{\link{scorecard}}
+#' @seealso \code{\link{scorecard}} \code{\link{scorecard_ply}}
 #'
 #' @examples
 #' \dontrun{
@@ -176,6 +178,104 @@ scorecard = function(bins, model, points0=600, odds0=1/19, pdo=50, basepoints_eq
 #' # scorecard
 #' # Example I # creat a scorecard
 #' card = scorecard(bins, m)
+#' card2 = scorecard2(bins=bins, dt=germancredit, y='creditability',
+#'   x=c("status.of.existing.checking.account", "duration.in.month", "credit.history",
+#'    "purpose", "credit.amount", "savings.account.and.bonds",
+#'    "present.employment.since", "installment.rate.in.percentage.of.disposable.income",
+#'    "personal.status.and.sex", "other.debtors.or.guarantors", "property",
+#'    "age.in.years", "other.installment.plans", "housing"))
+#'
+#' # credit score
+#' # Example I # only total score
+#' score1 = scorecard_ply(dt, card)
+#'
+#' # Example II # credit score for both total and each variable
+#' score2 = scorecard_ply(dt, card, only_total_score = F)
+#' }
+#' @import data.table
+#' @export
+scorecard2 = function(bins, dt, y, x=NULL, points0=600, odds0=1/19, pdo=50, basepoints_eq0=FALSE, positive='bad|1', ...) {
+  variable = NULL
+
+  setDT(dt)
+  # bins # if (is.list(bins)) rbindlist(bins)
+  if (!is.data.table(bins)) {
+    if (is.data.frame(bins)) {
+      bins = setDT(bins)
+    } else {
+      bins = rbindlist(bins, fill = TRUE)
+    }
+  }
+
+  # check x and y
+  dt = check_y(dt, y, positive)
+  # x
+  x_bins = bins[, unique(variable)]
+  if (is.null(x)) x = x_bins
+  x = x_variable(dt,y,x)
+
+  # dt to woe values
+  dt_woe = do.call(woebin_ply, args = c(list(dt=dt, bins=bins, print_info=FALSE), list(...)))
+
+  # model
+  model = glm(
+    as.formula(paste(y, "~ .")), family = "binomial",
+    data = dt_woe[,c(paste0(x,"_woe"),y), with=F])
+
+  return(scorecard(bins = bins, model = model, points0 = points0, odds0 = odds0, pdo = pdo, basepoints_eq0 = basepoints_eq0))
+}
+
+#' Score Transformation
+#'
+#' \code{scorecard_ply} calculates credit score using the results from \code{scorecard}.
+#'
+#' @param dt Original data
+#' @param card Scorecard generated from \code{scorecard}.
+#' @param only_total_score  Logical, default is TRUE. If it is TRUE, then the output includes only total credit score; Otherwise, if it is FALSE, the output includes both total and each variable's credit score.
+#' @param print_step A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0, no message is print.
+#' @param replace_blank_na Logical. Replace blank values with NA. Default is TRUE. This argument should be the same with \code{woebin}'s.
+#'
+#' @return A dataframe in score values
+#'
+#' @seealso \code{\link{scorecard}} \code{\link{scorecard2}}
+#'
+#' @examples
+#' \dontrun{
+#' # load germancredit data
+#' data("germancredit")
+#'
+#' # filter variable via missing rate, iv, identical value rate
+#' dt_sel = var_filter(germancredit, "creditability")
+#'
+#' # woe binning ------
+#' bins = woebin(dt_sel, "creditability")
+#' dt_woe = woebin_ply(dt_sel, bins)
+#'
+#' # glm ------
+#' m = glm(creditability ~ ., family = binomial(), data = dt_woe)
+#' # summary(m)
+#'
+#' # Select a formula-based model by AIC
+#' m_step = step(m, direction="both", trace=FALSE)
+#' m = eval(m_step$call)
+#' # summary(m)
+#'
+#' # predicted proability
+#' # dt_pred = predict(m, type='response', dt_woe)
+#'
+#' # performace
+#' # ks & roc plot
+#' # perf_eva(dt_woe$creditability, dt_pred)
+#'
+#' # scorecard
+#' # Example I # creat a scorecard
+#' card = scorecard(bins, m)
+#' card2 = scorecard2(bins=bins, dt=germancredit, y='creditability',
+#'   x=c("status.of.existing.checking.account", "duration.in.month", "credit.history",
+#'    "purpose", "credit.amount", "savings.account.and.bonds",
+#'    "present.employment.since", "installment.rate.in.percentage.of.disposable.income",
+#'    "personal.status.and.sex", "other.debtors.or.guarantors", "property",
+#'    "age.in.years", "other.installment.plans", "housing"))
 #'
 #' # credit score
 #' # Example I # only total score
@@ -187,16 +287,16 @@ scorecard = function(bins, model, points0=600, odds0=1/19, pdo=50, basepoints_eq
 #' @import data.table
 #' @export
 #'
-scorecard_ply = function(dt, card, only_total_score=TRUE, print_step=1L) {
+scorecard_ply = function(dt, card, only_total_score=TRUE, print_step=0L, replace_blank_na=TRUE) {
   # global variables or functions
   variable = bin = points = . = V1 = score = NULL
 
   # set dt as data.table
   dt = copy(setDT(dt))
-  # remove date/time col
-  dt = rmcol_datetime_unique1(dt)
-  # replace "" by NA
-  dt = rep_blank_na(dt)
+  # # remove date/time col
+  # dt = rmcol_datetime_unique1(dt)
+  # replace blank values by NA
+  if (replace_blank_na) dt = rep_blank_na(dt)
   # print_step
   print_step = check_print_step(print_step)
 

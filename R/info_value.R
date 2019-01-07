@@ -1,14 +1,15 @@
 #' Information Value
 #'
-#' This function calculates information value (IV) for multiple x variables.
+#' This function calculates information value (IV) for multiple x variables. It treats each unique value in x variables as a group. If there is a zero number of y class, it will be replaced by 0.99 to make sure woe/iv is calculable.
 #'
 #' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
 #' @param y Name of y variable.
-#' @param x Name of x variables. Default is NULL. If x is NULL, then all variables except y are counted as x variables.
+#' @param x Name of x variables. Default is NULL. If x is NULL, then all columns except y are counted as x variables.
 #' @param positive Value of positive class, default is "bad|1".
 #' @param order Logical, default is TRUE. If it is TRUE, the output will descending order via iv.
 #'
-#' @return Information Value
+#' @return A dataframe with columns for variable and info_value
+#'
 #' @details IV is a very useful concept for variable selection while developing credit scorecards. The formula for information value is shown below: \deqn{IV = \sum(DistributionBad_{i} - DistributionGood_{i})*\ln(\frac{DistributionBad_{i}}{DistributionGood_{i}}).} The log component in information value is defined as weight of evidence (WOE), which is shown as \deqn{WeightofEvidence = \ln(\frac{DistributionBad_{i}}{DistributionGood_{i}}).}
 #' The relationship between information value and predictive power is as follows:
 #' \tabular{rr}{
@@ -36,13 +37,14 @@ iv = function(dt, y, x=NULL, positive="bad|1", order=TRUE) {
   info_value = label = NULL # no visible binding for global variable
 
   # set dt as data.table
-  dt = setDT(dt)
-  # remove date/time col
-  dt = rmcol_datetime_unique1(dt)
-  # replace "" by NA
-  dt = rep_blank_na(dt)
+  dt = copy(setDT(dt))
+  if (!is.null(x)) dt = dt[, c(y,x), with=FALSE]
   # check y
   dt = check_y(dt, y, positive)
+  # # remove date/time col
+  # dt = rmcol_datetime_unique1(dt)
+  # # replace "" by NA
+  # dt = rep_blank_na(dt)
   # x variable names
   x = x_variable(dt, y, x)
 

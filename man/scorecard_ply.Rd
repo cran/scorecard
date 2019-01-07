@@ -4,7 +4,8 @@
 \alias{scorecard_ply}
 \title{Score Transformation}
 \usage{
-scorecard_ply(dt, card, only_total_score = TRUE, print_step = 1L)
+scorecard_ply(dt, card, only_total_score = TRUE, print_step = 0L,
+  replace_blank_na = TRUE)
 }
 \arguments{
 \item{dt}{Original data}
@@ -14,9 +15,11 @@ scorecard_ply(dt, card, only_total_score = TRUE, print_step = 1L)
 \item{only_total_score}{Logical, default is TRUE. If it is TRUE, then the output includes only total credit score; Otherwise, if it is FALSE, the output includes both total and each variable's credit score.}
 
 \item{print_step}{A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0, no message is print.}
+
+\item{replace_blank_na}{Logical. Replace blank values with NA. Default is TRUE. This argument should be the same with \code{woebin}'s.}
 }
 \value{
-Credit score
+A dataframe in score values
 }
 \description{
 \code{scorecard_ply} calculates credit score using the results from \code{scorecard}.
@@ -52,6 +55,12 @@ m = eval(m_step$call)
 # scorecard
 # Example I # creat a scorecard
 card = scorecard(bins, m)
+card2 = scorecard2(bins=bins, dt=germancredit, y='creditability',
+  x=c("status.of.existing.checking.account", "duration.in.month", "credit.history",
+   "purpose", "credit.amount", "savings.account.and.bonds",
+   "present.employment.since", "installment.rate.in.percentage.of.disposable.income",
+   "personal.status.and.sex", "other.debtors.or.guarantors", "property",
+   "age.in.years", "other.installment.plans", "housing"))
 
 # credit score
 # Example I # only total score
@@ -62,5 +71,5 @@ score2 = scorecard_ply(dt, card, only_total_score = F)
 }
 }
 \seealso{
-\code{\link{scorecard}}
+\code{\link{scorecard}} \code{\link{scorecard2}}
 }
