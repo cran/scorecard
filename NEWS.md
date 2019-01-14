@@ -1,3 +1,9 @@
+# scorecard 0.2.1
+
+* revised one_hot function
+* modified .export used in foreach loop
+* add my name in license file
+
 # scorecard 0.2.0
 
 * fixed a bug is woebin function cant modify positive values

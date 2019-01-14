@@ -32,7 +32,7 @@ scorecard2(bins, dt, y, x = NULL, points0 = 600, odds0 = 1/19,
 A scorecard dataframe
 }
 \description{
-\code{scorecard} creates a scorecard based on the results from \code{woebin} and \code{glm}.
+\code{scorecard2} creates a scorecard based on the results from \code{woebin}. It has the same function with \code{scorecard}, but without model object input.
 }
 \examples{
 \dontrun{
