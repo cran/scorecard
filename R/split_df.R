@@ -7,7 +7,7 @@
 #' @param ratio A numeric value, default is 0.7. It indicates the ratio of total rows contained in one split, must less than 1.
 #' @param seed A random seed, default is 618.
 #'
-#' @return A list of dataframes
+#' @return A list of data frames
 #'
 #' @examples
 #' # load German credit data
@@ -32,11 +32,11 @@ split_df = function(dt, y=NULL, ratio=0.7, seed=618) {
   ind = NULL
 
   # set dt as data.table
-  dt = setDT(dt)
+  dt = setDT(copy(dt)) # setDT(dt)
   # remove date/time col
   # dt = rmcol_datetime_unique1(dt)
   # replace "" by NA
-  dt = rep_blank_na(dt)
+  # dt = rep_blank_na(dt)
 
   # set ratio range
   if (!is.numeric(ratio) || length(ratio) >2 || sum(ratio)>1) {

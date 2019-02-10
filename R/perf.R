@@ -158,7 +158,7 @@ plot_density = function(dt_lst, title=NULL, positive, ...) {
   min_pred = dt_df[,min(pred)]
   if (max_pred == 1) min_pred = 0
 
-  # dataframe of max density by datset and label
+  # data frame of max density by datset and label
   max_density_by_datset_label = dt_df[
     , .(pred=density(pred)$x, dens=density(pred)$y), by=c('datset','label')
   ][, max_dens := max(dens), by=c('datset','label')
@@ -327,7 +327,7 @@ plot_roc = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     merge(rbindlist(pm, idcol = 'datset')[,.(datset,auc=AUC)],
           rbindlist(co, idcol = 'datset')[metrics == 'roc',.(datset, pred_threshold,coord)], by = 'datset'),
     by = 'datset', all.x = TRUE
-  )[, datset := sprintf('%s, KS=%.4f\np=%.4f, %s', format(datset), round(auc,4), pred_threshold, coord)][]
+  )[, datset := sprintf('%s, AUC=%.4f\np=%.4f, %s', format(datset), round(auc,4), pred_threshold, coord)][]
 
   # optimal cutoff
   dt_cut = merge(
@@ -479,6 +479,7 @@ func_dat_labelpred = function(pred, label, title, positive, seed, ...) {
   # convert pred/label into list of list, such as:
   # pred = list(datset = list(pred = ...))
   lst_pl = list(pred=pred, label=label)
+  # map on lst_pl
   lst_pl2 = Map(function(x, xname) {
     if (is.null(x)) return(x)
 
@@ -670,13 +671,12 @@ pf_cutoffs = function(dt_ev_lst) {
 #'
 #' @examples
 #' \dontrun{
+#' # data preparing ------
 #' # load germancredit data
 #' data("germancredit")
-#'
 #' # filter variable via missing rate, iv, identical value rate
 #' dt_f = var_filter(germancredit, "creditability")
-#'
-#' # breaking dt into train and test ------
+#' # breaking dt into train and test
 #' dt_list = split_df(dt_f, "creditability")
 #' label_list = lapply(dt_list, function(x) x$creditability)
 #'
@@ -722,12 +722,12 @@ pf_cutoffs = function(dt_ev_lst) {
 #' ###### perf_psi examples ######
 #' # Example I # only total psi
 #' psi1 = perf_psi(score = score_list, label = label_list)
-#' psi1$psi  # psi dataframe
+#' psi1$psi  # psi data frame
 #' psi1$pic  # pic of score distribution
 #'
 #' # Example II # both total and variable psi
 #' psi2 = perf_psi(score = score_list, label = label_list)
-#' # psi2$psi  # psi dataframe
+#' # psi2$psi  # psi data frame
 #' # psi2$pic  # pic of score distribution
 #'
 #'
@@ -797,7 +797,7 @@ perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'l
   if (!is.null(title)) title = paste0(title,': ')
   # type
   type = list(...)[["type"]]
-  if (!isFALSE(show_plot) & !is.null(type)) show_plot = type
+  if (isTRUE(show_plot) & !is.null(show_plot) & !is.null(type)) show_plot = type
   # show_plot
   show_plot = intersect(show_plot, c('ks', 'lift', 'gain', 'roc', 'lz', 'pr', 'f1', 'density'))
   # pic
@@ -825,7 +825,7 @@ psi_metric = function(dt_sn, names_datset) {
   # dat = copy(dat)[,y:=NULL][complete.cases(dat),]
   AE = bin_PSI = NULL
 
-  # dataframe of bin, actual, expected
+  # data frame of bin, actual, expected
   dt_bae = dcast(
     dt_sn[, .N, keyby = c('datset', 'bin')],
     bin ~ datset, value.var="N", fill = 0.99
@@ -882,9 +882,24 @@ psi_plot = function(dt_psi, psi_sn, title, sn) {
 
 
 
+
+gains_table_format = function(dt_distr) {
+  . = good = bad = bin = count = datset = NULL
+
+  dt_distr = dt_distr[, .(
+    bin,
+    count, cum_count = cumsum(count),
+    good,  cum_good = cumsum(good),
+    bad,   cum_bad = cumsum(bad),
+    count_distr = count/sum(count),
+    badprob=bad/count, cum_badprob = cumsum(bad)/cumsum(count),
+    approval_rate = cumsum(count)/sum(count) ), by = datset]
+
+  return(dt_distr)
+}
 #' Gains Table
 #'
-#' \code{gains_table} creates a dataframe including distribution of total, good, bad, bad rate and approval rate by score bins. It provides both equal width and equal frequency intervals on score binning.
+#' \code{gains_table} creates a data frame including distribution of total, good, bad, bad rate and approval rate by score bins. It provides both equal width and equal frequency intervals on score binning.
 #'
 #' @param score A list of credit score for actual and expected data samples. For example, score = list(actual = scoreA, expect = scoreE).
 #' @param label A list of label value for actual and expected data samples. For example, label = list(actual = labelA, expect = labelE).
@@ -893,7 +908,7 @@ psi_plot = function(dt_psi, psi_sn, title, sn) {
 #' @param positive Value of positive class, default is "bad|1".
 #' @param ... Additional parameters.
 #'
-#' @return A dataframe
+#' @return A data frame
 #' @seealso \code{\link{perf_eva}} \code{\link{perf_psi}}
 #'
 #' @examples
@@ -949,12 +964,12 @@ psi_plot = function(dt_psi, psi_sn, title, sn) {
 #' ###### perf_psi examples ######
 #' # Example I # only total psi
 #' psi1 = perf_psi(score = score_list, label = label_list)
-#' psi1$psi  # psi dataframe
+#' psi1$psi  # psi data frame
 #' psi1$pic  # pic of score distribution
 #'
 #' # Example II # both total and variable psi
 #' psi2 = perf_psi(score = score_list, label = label_list)
-#' # psi2$psi  # psi dataframe
+#' # psi2$psi  # psi data frame
 #' # psi2$pic  # pic of score distribution
 #'
 #'
@@ -970,71 +985,80 @@ psi_plot = function(dt_psi, psi_sn, title, sn) {
 #'
 #' @export
 gains_table = function(score, label, bin_num=10, bin_type='freq', positive='bad|1', ...) {
-  datset = bin = group = V1 = . = count = bad = V2 = NULL
+  . = V1 = V2 = bad = bin = count = datset = group = NULL
 
   # arguments
   # seed
   seed = list(...)[['seed']]
   if (is.null(seed)) seed = 618
-  # bin_num
-  if (bin_num!='max' & bin_num <= 1) bin_num = 10
-  # bin_type
-  if (!(bin_type %in% c('freq', 'width'))) bin_type='freq'
+  # title
+  title = list(...)[['title']]
+  if (is.null(title)) title = NULL
   # return_dt_psi
   return_dt_psi = list(...)[['return_dt_psi']]
   if (is.null(return_dt_psi)) return_dt_psi = FALSE
-  # dt_sl
-  dt_sl = list(...)[['dt_sl']]
 
+  # bin_num
+  if (bin_num != 'max' & bin_num <= 1) bin_num = 10
+  # bin_type
+  if (!(bin_type %in% c('freq', 'width'))) bin_type = 'freq'
+
+
+
+  # data frame of score and label
+  dt_sl = list(...)[['dt_sl']]
   if (is.null(dt_sl) & !is.null(score) & !is.null(label)) {
 
     # dateset list of score and label
     dt_sl = suppressWarnings( func_dat_labelpred(
-      pred=score, label=label, title=NULL, positive=positive, seed=seed) )
+      pred=score, label=label, title=title, positive=positive, seed=seed) )
+    # rename dt_sl as c('label','score')
     dt_sl = lapply(dt_sl, function(x) {
       x[,.(label, score=x[[setdiff(names(x),'label')]])]
     })
+    # rbind the list into a data frame, and set datset column as factor
     names_datset = names(dt_sl)
     dt_sl = rbindlist(dt_sl, idcol = 'datset')[, datset := factor(datset, levels = names_datset)]
   }
 
 
-  # gains table
-  if ( bin_num=='max' || bin_num>=dt_sl[, length(unique(score))] ) {
-    dt_psi = copy(dt_sl)[, bin := factor(score)]
 
+  is_score = dt_sl[,mean(score)>1]
+  # breaks
+  if ( bin_num=='max' || bin_num >= dt_sl[, length(unique(score))] ) {
+    # in each value
+    dt_psi = copy(dt_sl)[, bin := factor(score)]
   } else {
     if (bin_type == 'freq') {
-      # breaks in equal frequency
+      # in equal frequency
       brkp = copy(dt_sl)[order(score)
-                       ][, group := ceiling(.I/(.N/bin_num))
-                   ][, score[.N], by = group
-                   ][, c(-Inf, V1[-.N], Inf)]
+                         ][, group := ceiling(.I/(.N/bin_num))
+                         ][, .(score = score[1]), by = group
+                         ][, c(-Inf, score[-1], Inf)]
 
-    } else { #  if (bin_type == 'width')
-      # breaks in equal width
-      minmax = dt_sl[, sapply(.SD, function(x) list(min(x), max(x))), by=datset, .SDcols=c('score')][,.(mins = max(V1), maxs = min(V2))]
+    } else if (bin_type == 'width') {
+      # in equal width
+      minmax = dt_sl[, sapply(.SD, function(x) list(min(x), max(x))), by=datset, .SDcols=c('score')
+                   ][,.(mins = max(V1), maxs = min(V2))] # choose min of max value, and max of min value by dataset
       brkp = seq(minmax$mins, minmax$maxs, length.out = bin_num+1)
-      if (dt_sl[,mean(score)>1]) brkp = round(brkp)
+      if (is_score) brkp = round(brkp)
       brkp = c(-Inf, brkp[-c(1, length(brkp))], Inf)
-
     }
-    dt_psi = copy(dt_sl)[, bin := cut(score, brkp, right = FALSE, dig.lab = 10, ordered_result = F)]
-
+    dt_psi = dt_sl[, bin := cut(score, unique(brkp), right = FALSE, dig.lab = 10, ordered_result = F)]
   }
-  if (return_dt_psi) return(dt_psi)
+  if (return_dt_psi) return(dt_psi) # innter result usded in perf_psi function
 
-  # distribution tables
-  dt_distr = dt_psi[, .(count=.N, bad = sum(label==1)), keyby = .(datset,bin)
+  # distribution table
+  dt_distr = dt_psi[, .(count=.N, good = sum(label==0), bad = sum(label==1)), keyby = .(datset,bin)
                   ][order(datset, -bin)]
-  if (dt_sl[,mean(score)<=1]) dt_distr = dt_distr[order(datset, bin)] # if score is p1
-  dt_distr = dt_distr[, .(bin, count, cum_count = cumsum(count), good=count-bad, cum_good = cumsum(count-bad), bad, cum_bad = cumsum(bad), count_distr = count/sum(count), badprob=bad/count, cum_badprob = cumsum(bad)/cumsum(count), approval_rate = cumsum(count)/sum(count) ), by = datset]
-
+  if (!is_score) dt_distr = dt_distr[order(datset, bin)] #is predicted probability
+  # gains table
+  dt_distr = gains_table_format(dt_distr)
   return(dt_distr)
 }
 
 # @param bin_type Whether in equal frequency or width when preparing dataset to calculates psi. Default is 'width'.
-# @param return_distr_dat Logical. Default is FALSE. Whether to return a list of dataframes including distribution of total, good, bad cases by score bins in both equal width and equal frequency. This table is also named gains table.
+# @param return_distr_dat Logical. Default is FALSE. Whether to return a list of data frames including distribution of total, good, bad cases by score bins in both equal width and equal frequency. This table is also named gains table.
 # @param bin_num Integer. Default is 10. The number of score bins in distribution tables.
 
 #' PSI
@@ -1047,8 +1071,10 @@ gains_table = function(score, label, bin_num=10, bin_type='freq', positive='bad|
 #' @param show_plot Logical. Default is TRUE.
 #' @param positive Value of positive class, default is "bad|1".
 #' @param threshold_variable Integer. Default is 20. If the number of unique values > threshold_variable, the provided score will be counted as total credit score, otherwise, it is variable score.
+#' @param var_skip Name of variables that are not score, such as id column. It should be the same with the var_kp in scorecard_ply function. Default is NULL.
 #' @param ... Additional parameters.
-#' @return A dataframe of psi and graphics of credit score distribution
+#'
+#' @return A data frame of psi and graphics of credit score distribution
 #' @seealso \code{\link{perf_eva}} \code{\link{gains_table}}
 #'
 #' @details The population stability index (PSI) formula is displayed below: \deqn{PSI = \sum((Actual\% - Expected\%)*(\ln(\frac{Actual\%}{Expected\%}))).} The rule of thumb for the PSI is as follows: Less than 0.1 inference insignificant change, no action required; 0.1 - 0.25 inference some minor change, check other scorecard monitoring metrics; Greater than 0.25 inference major shift in population, need to delve deeper.
@@ -1107,12 +1133,12 @@ gains_table = function(score, label, bin_num=10, bin_type='freq', positive='bad|
 #' ###### perf_psi examples ######
 #' # Example I # only total psi
 #' psi1 = perf_psi(score = score_list, label = label_list)
-#' psi1$psi  # psi dataframe
+#' psi1$psi  # psi data frame
 #' psi1$pic  # pic of score distribution
 #'
 #' # Example II # both total and variable psi
 #' psi2 = perf_psi(score = score_list, label = label_list)
-#' # psi2$psi  # psi dataframe
+#' # psi2$psi  # psi data frame
 #' # psi2$pic  # pic of score distribution
 #'
 #'
@@ -1128,7 +1154,7 @@ gains_table = function(score, label, bin_num=10, bin_type='freq', positive='bad|
 #' @import data.table ggplot2 gridExtra
 #' @export
 #'
-perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad|1", threshold_variable=20, ...) {
+perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad|1", threshold_variable=20, var_skip=NULL, ...) {
   # # global variables
   . = datset = group = V1 = bin = NULL
 
@@ -1152,7 +1178,7 @@ perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad
 
 
   rt = list() # return list
-  for (sn in setdiff(names(dt_sl), c('datset', 'label'))) { # sn: score names
+  for (sn in setdiff(names(dt_sl), c('datset', 'label', var_skip))) { # sn: score names
     # dataset for sn
     dt_sn = dt_sl[,.(datset, label, score=dt_sl[[sn]])]
 
@@ -1183,7 +1209,7 @@ perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad
     }
     rt[['psi']][[sn]] = rbindlist(temp_psi, idcol = 'dataset')
 
-    # equal freq / width dataframe
+    # equal freq / width data frame
     if (return_distr_dat) rt[['dat']][[sn]] = gains_table(score=NULL, label=NULL, bin_num=10, bin_type=bin_type, positive = positive, return_dt_psi=FALSE, dt_sl=dt_sn)
   }
 

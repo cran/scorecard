@@ -13,7 +13,7 @@
 #' @param return_rm_reason Logical, default is FALSE.
 #' @param positive Value of positive class, default is "bad|1".
 #'
-#' @return A dataframe with columns for y and selected x variables, and a dataframe with columns for remove reason if return_rm_reason == TRUE.
+#' @return A data frame with columns for y and selected x variables, and a data frame with columns for remove reason if return_rm_reason == TRUE.
 #'
 #' @examples
 #' # Load German credit data
@@ -30,6 +30,13 @@
 #' str(dt_sel2$dt)
 #' str(dt_sel2$rm)
 #'
+#' # keep columns manually, such as rowid
+#' germancredit$rowid = row.names(germancredit)
+#' dt_sel3 = var_filter(germancredit, y = "creditability", var_kp = 'rowid')
+#'
+#' # remove columns manually
+#' dt_sel4 = var_filter(germancredit, y = "creditability", var_rm = 'rowid')
+#'
 #' @import data.table
 #' @export
 #'
@@ -42,7 +49,7 @@ var_filter = function(dt, y, x = NULL, iv_limit = 0.02, missing_limit = 0.95, id
   . = info_value = variable = rt = rm_reason = NULL
 
   # set dt as data.table
-  dt = copy(setDT(dt))
+  dt = setDT(copy(dt)) # copy(setDT(dt))
   if (!is.null(x)) dt = dt[, c(y,x), with=FALSE]
   # check y
   dt = check_y(dt, y, positive)
