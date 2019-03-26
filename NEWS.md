@@ -1,3 +1,15 @@
+# scorecard 0.2.4
+
+* fixed a bug in woebin when only NA and special values
+* remove 'missing' value from breaks_list if it exists.
+* woebin function donot require y if label column is not available for equal freq/width method. 
+* woebin_ply supports converting data into bin value.
+* fixed a bug in perf_eva when pred is score
+* move the gains table to the last sheet in exported report excel, and only have one data set.
+* fixed a bug in woebin_ply when only x variables in bins are available in input dataset
+* fixed a bug in report function export test binning graphics only.
+* fixed a bug in woebin function when there are only two unique values for tree and chimerge methods.
+
 # scorecard 0.2.3
 
 * add var_skip argument in woebin function, and var_kp argument in scorecard_ply function. Therefore, the id column can be handle during the development of scorecard model.

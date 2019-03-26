@@ -40,7 +40,7 @@ bins = woebin(dt, y = "creditability")
 dt_woe = woebin_ply(dt, bins=bins)
 str(dt_woe)
 
-\dontrun{
+\donttest{
 # Example II
 # binning for germancredit dataset
 bins_germancredit = woebin(germancredit, y="creditability")
@@ -52,6 +52,9 @@ germancredit_woe = woebin_ply(germancredit, bins_germancredit)
 # bins is a data frame
 bins_df = data.table::rbindlist(bins_germancredit)
 germancredit_woe = woebin_ply(germancredit, bins_df)
+
+# return value is bin but not woe
+germancredit_bin = woebin_ply(germancredit, bins_germancredit, value = 'bin')
 }
 
 }

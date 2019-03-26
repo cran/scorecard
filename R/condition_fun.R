@@ -37,10 +37,12 @@ check_datetime_cols = function(dt) {
   return(dt)
 }
 # check categorical columns' unique values
-check_cateCols_uniqueValues = function(dt) {
+check_cateCols_uniqueValues = function(dt, var_skip = NULL) {
   setDT(dt)
   # categorical columns
   cate_cols = names(which(dt[, sapply(.SD, function(x) is.character(x) | is.factor(x))]))
+  cate_cols = setdiff(cate_cols, var_skip)
+
   if (length(cate_cols) > 0) {
     # have more than 50 unique values
     cateCols_uniVal50 = names(which(dt[, sapply(.SD, function(x) length(unique(x)) > 50), .SDcols = cate_cols]))
@@ -56,7 +58,7 @@ rep_blank_na = function(dt) {
   dt = setDT(dt)
 
   if (any(dt == "", na.rm = TRUE)) {
-    warning(sprintf('The blank characters are replaced with NAs, which are located in columns of \n%s', paste(names(which(dt[,sapply(.SD, function(x) any(x=="",na.rm = T))])), collapse = ", ")))
+    warning(sprintf('The blank values are replaced with NAs in the following columns:\n%s', paste(names(which(dt[,sapply(.SD, function(x) any(x=="",na.rm = T))])), collapse = ", ")))
 
     dt[dt == ""] = NA
   }
@@ -138,10 +140,18 @@ check_breaks_list = function(breaks_list, xs) {
     if (is.character(breaks_list)) {
       breaks_list = eval(parse(text = breaks_list))
     }
-    if (!is.list(breaks_list)) {
+    if (!inherits(breaks_list, 'list')) {
       stop("Incorrect inputs; breaks_list should be a list.")
 
     } else {
+      # remove missing from breakpoints
+      breaks_list = lapply(breaks_list, function(x) {
+        x=setdiff(x, 'missing')
+        if (length(x)==0) x = NULL
+        return(x)
+      })
+
+      # check variable names
       xs_breakslist = names(breaks_list)
       if (!identical(xs_breakslist, xs)) {
 

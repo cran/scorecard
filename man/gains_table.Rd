@@ -27,7 +27,7 @@ A data frame
 \code{gains_table} creates a data frame including distribution of total, good, bad, bad rate and approval rate by score bins. It provides both equal width and equal frequency intervals on score binning.
 }
 \examples{
-\dontrun{
+\donttest{
 # data preparing ------
 # load germancredit data
 data("germancredit")
@@ -90,12 +90,12 @@ psi2 = perf_psi(score = score_list, label = label_list)
 
 ###### gains_table examples ######
 # Example I, input score and label can be a list or a vector
-gains_table(score = score_list$train, label = label_list$train)
-gains_table(score = score_list, label = label_list)
+g1 = gains_table(score = score_list$train, label = label_list$train)
+g2 = gains_table(score = score_list, label = label_list)
 
 # Example II, specify the bins number and type
-gains_table(score = score_list, label = label_list, bin_num = 20)
-gains_table(score = score_list, label = label_list, bin_type = 'width')
+g3 = gains_table(score = score_list, label = label_list, bin_num = 20)
+g4 = gains_table(score = score_list, label = label_list, bin_type = 'width')
 }
 
 }

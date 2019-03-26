@@ -24,7 +24,7 @@ woebin(dt, y, x = NULL, var_skip = NULL, breaks_list = NULL,
 
 \item{special_values}{the values specified in special_values will be in separate bins. Default is NULL.}
 
-\item{stop_limit}{Stop binning segmentation when information value gain ratio less than the stop_limit if using tree method; or stop binning merge when the minimum of chi-square larger than 'qchisq(1-stoplimit, 1)' if using chimerge method. Accepted range: 0-0.5; default is 0.1.}
+\item{stop_limit}{Stop binning segmentation when information value gain ratio less than the 'stop_limit' if using tree method; or stop binning merge when the chi-square of each neighbor bins are larger than the threshold under significance level of 'stop_limit' and freedom degree of 1 if using chimerge method. Accepted range: 0-0.5; default is 0.1.}
 
 \item{count_distr_limit}{The minimum count distribution percentage. Accepted range: 0.01-0.2; default is 0.05.}
 
@@ -36,7 +36,7 @@ woebin(dt, y, x = NULL, var_skip = NULL, breaks_list = NULL,
 
 \item{print_step}{A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.}
 
-\item{method}{Optimal binning method, it should be "tree" or "chimerge". Default is "tree".}
+\item{method}{Four methods are provided, "tree" and "chimerge" for optimal binning that support both numerical and categorical variables, and 'width' and 'freq' for equal binning that support numerical variables only. Default is "tree".}
 
 \item{save_breaks_list}{A string. The file name to save breaks_list. Default is None.}
 
@@ -72,10 +72,6 @@ bins2_tree
 bins2_chi = woebin(germancredit, y="creditability",
    x=c("credit.amount","housing"), method="chimerge")
 
-# save breaks_list as a R file
-bins2 = woebin(germancredit, y="creditability",
-   x=c("credit.amount","housing"), save_breaks_list='breaks_list')
-
 # binning in equal freq/width # only supports numerical variables
 numeric_cols = c("duration.in.month", "credit.amount",
   "installment.rate.in.percentage.of.disposable.income", "present.residence.since",
@@ -83,6 +79,9 @@ numeric_cols = c("duration.in.month", "credit.amount",
   "number.of.people.being.liable.to.provide.maintenance.for")
 bins_freq  = woebin(germancredit, y="creditability", x=numeric_cols, method="freq")
 bins_width = woebin(germancredit, y="creditability", x=numeric_cols, method="width")
+
+# y can be NULL if no label column in dataset
+bins_freq_noy  = woebin(germancredit, y=NULL, x=numeric_cols)
 
 # Example II
 # binning of the germancredit dataset
@@ -111,6 +110,11 @@ special_values = list(
 bins_cus_brk = woebin(dat, y="creditability",
   x=c("age.in.years","credit.amount","housing","purpose"),
   breaks_list=breaks_list, special_values=special_values)
+
+# Example IV
+# save breaks_list as a R file
+bins2 = woebin(germancredit, y="creditability",
+   x=c("credit.amount","housing"), save_breaks_list='breaks_list')
 
 }
 

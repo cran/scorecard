@@ -34,7 +34,7 @@ A data frame of psi and graphics of credit score distribution
 The population stability index (PSI) formula is displayed below: \deqn{PSI = \sum((Actual\% - Expected\%)*(\ln(\frac{Actual\%}{Expected\%}))).} The rule of thumb for the PSI is as follows: Less than 0.1 inference insignificant change, no action required; 0.1 - 0.25 inference some minor change, check other scorecard monitoring metrics; Greater than 0.25 inference major shift in population, need to delve deeper.
 }
 \examples{
-\dontrun{
+\donttest{
 # data preparing ------
 # load germancredit data
 data("germancredit")
@@ -88,6 +88,9 @@ perf_eva(pred = pred_list, label = label_list)
 psi1 = perf_psi(score = score_list, label = label_list)
 psi1$psi  # psi data frame
 psi1$pic  # pic of score distribution
+# modify colors
+# perf_psi(score = score_list, label = label_list,
+#          line_color='#FC8D59', bar_color=c('#FFFFBF', '#99D594'))
 
 # Example II # both total and variable psi
 psi2 = perf_psi(score = score_list, label = label_list)
@@ -97,12 +100,12 @@ psi2 = perf_psi(score = score_list, label = label_list)
 
 ###### gains_table examples ######
 # Example I, input score and label can be a list or a vector
-gains_table(score = score_list$train, label = label_list$train)
-gains_table(score = score_list, label = label_list)
+g1 = gains_table(score = score_list$train, label = label_list$train)
+g2 = gains_table(score = score_list, label = label_list)
 
 # Example II, specify the bins number and type
-gains_table(score = score_list, label = label_list, bin_num = 20)
-gains_table(score = score_list, label = label_list, bin_type = 'width')
+g3 = gains_table(score = score_list, label = label_list, bin_num = 20)
+g4 = gains_table(score = score_list, label = label_list, bin_type = 'width')
 }
 }
 \seealso{
