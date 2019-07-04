@@ -77,7 +77,11 @@ var_filter = function(dt, y, x = NULL, iv_limit = 0.02, missing_limit = 0.95, id
   # -na percentage
   missing_rate = dt[, sapply(.SD, function(a) sum(is.na(a))/length(a)), .SDcols = x]
   # -element percentage
-  identical_rate = dt[, sapply(.SD, function(a) max(table(a))/sum(!is.na(a)) ), .SDcols = x]
+  identical_rate = dt[, sapply(.SD, function(a) {
+    pt = prop.table(table(a))
+    max_rate = ifelse(length(pt) == 0, Inf, max(pt, na.rm = TRUE))
+    return(max_rate)
+  } ), .SDcols = x]
 
   # datatable  iv na ele
   dt_var_selector =

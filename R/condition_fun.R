@@ -58,7 +58,7 @@ rep_blank_na = function(dt) {
   dt = setDT(dt)
 
   if (any(dt == "", na.rm = TRUE)) {
-    warning(sprintf('The blank values are replaced with NAs in the following columns:\n%s', paste(names(which(dt[,sapply(.SD, function(x) any(x=="",na.rm = T))])), collapse = ", ")))
+    warning(sprintf('The blank values are replaced with NAs in the following columns:\n%s', paste(names(which(dt[,sapply(.SD, function(x) any(grepl('^\\s*$', x), na.rm = T))])), collapse = ", ")))
 
     dt[dt == ""] = NA
   }
@@ -217,22 +217,90 @@ sec_to_hms = function(sec) {
   return(sprintf("%02.f:%02.f:%02.f",h,m,s))
 }
 
+# check check_stop_limit
+check_stop_limit = function(stop_limit, xs) {
+  sl = list()
 
+  if (!is.list(stop_limit)) {
+    sl = as.list(rep(stop_limit, length(xs)))
+    sl = setNames(sl, xs)
+  } else {
+    xs2 = setdiff(xs, names(stop_limit))
+
+    sl = c(stop_limit,
+           as.list(rep(0.1), length(xs2)) )
+    sl = setNames(sl, c(names(stop_limit), xs2))
+  }
+
+  sl = lapply(sl, function(s) {
+    if (!((s >0 & s <=0.5) || s == 'N')) s = 0.1
+    return(s)
+  })
+  return(sl)
+}
 
 # y to good bad
 # groupby or dcast
 # groupby is faster via data.table package
-y_to_goodbad = function(dt, y) {
-  # dt = data.table(x = rnorm(1e+8), y = sample(c(rep(0,9),1), 1e+8, replace = TRUE))
+# y_to_goodbad = function(dt, y) {
+#   # dt = data.table(x = rnorm(1e+8), y = sample(c(rep(0,9),1), 1e+8, replace = TRUE))
+#   #
+#   # system.time(
+#   #   dcast(dt, x~y, fun=length, value.var = 'y')
+#   # )
+#   #
+#   # system.time(
+#   #   dt[, .(good=sum(y==0), bad=sum(y==1)), by=x]
+#   # )
+#
+#
+#
+# }
+
+
+menu2 = function(choices, title, chk_rng = TRUE) {
+  cat(title, '\n')
+  for (l in seq_along(choices)) cat(sprintf('%s: %s', l, choices[l]), '\n')
+
+  if (chk_rng) {
+    sel = 'init'
+    while (!(sel %in% c(seq_len(length(choices)), 'save') || grepl('^go[1-9][0-9]*$', sel))) {
+      sel = readline("Selection (1-3, goX, save): ")
+      if (grepl('^[1-9][0-9]*$', sel)) sel = as.integer(sel)
+    }
+  } else {
+    sel = readline("Selection: ")
+    if (grepl('^[1-9][0-9]*$', sel)) sel = as.integer(sel)
+  }
+
+  return(sel)
+}
+
+
+
+brk_txt2vector = function(brk) {
+  if (is.null(brk) || is.na(brk)) return(brk)
+
+  v = strsplit(brk, "(?<!\\%),(?!\\%)", perl = T)[[1]]
+  v = trimws(v)
+  v = sub('[\'\"](.+)[\'\"]', '\\1', v)
+
+  # dtbrk = data.table(
+  #   brk = brk
+  # )[, strsplit(brk, '%,%')
+  # ][, id := .I
+  # ][, strsplit(V1, ','), by =id
+  # ][, V1 := trimws(V1)
+  # ][, id2 := .I
+  # ][, id3 := id - shift(id,type='lag')]
+  # # dtbrk[1, id3 := dtbrk[2, id3]]
   #
-  # system.time(
-  #   dcast(dt, x~y, fun=length, value.var = 'y')
-  # )
+  # rowid = which(dtbrk[, (id - shift(id,type = 'lag')) == 1])
   #
-  # system.time(
-  #   dt[, .(good=sum(y==0), bad=sum(y==1)), by=x]
-  # )
+  # v = rbind(
+  #   data.table(i = rowid, v = paste(dtbrk[rowid-1,V1], dtbrk[rowid,V1], sep = '%,%')),
+  #   dtbrk[-c(rowid, rowid-1), .(i = id2, v=V1)]
+  # )[order(i)][,sub('[\'\"](.+)[\'\"]', '\\1', v)]
 
-
-
+  return(v)
 }
