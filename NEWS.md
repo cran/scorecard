@@ -1,9 +1,17 @@
+# scorecard 0.2.6
+
+* split_df function supports multiple data frames.
+* added a cross validation function perf_cv
+* modified the default value for no_cores in woebin and woebin_ply function.
+* woebin_plot supports displaying woe values
+* fixed a bug when Inf or NaN exist in input data for woebin and woebin_ply function
+
 # scorecard 0.2.5
 
 * fixed various bugs in woebin_adj that returns breaks_list including missing without quotes.
 * fixed a bug in perf_eva when pred is score.
 * fixed a bug in woebin function when y is not provided.
-* remove the .export option in foreach loop, inorder to suppress the warning of 'already exported varables ...'
+* remove the .export option in foreach loop, in order to suppress the warning of 'already exported variables ...'
 * modified the calculation of identical rate in var_filter function
 * using forking on non-windows os and psock on windows when makeCluster in parallel 
 

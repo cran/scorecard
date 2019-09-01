@@ -4,14 +4,14 @@
 #'
 #' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
 #' @param y Name of y variable.
-#' @param x Name of x variables. Default is NULL. If x is NULL, then all columns except y are counted as x variables.
-#' @param iv_limit The information value of kept variables should >= iv_limit. The default is 0.02.
-#' @param missing_limit The missing rate of kept variables should <= missing_limit. The default is 0.95.
-#' @param identical_limit The identical value rate (excluding NAs) of kept variables should <= identical_limit. The default is 0.95.
-#' @param var_rm Name of force removed variables, default is NULL.
-#' @param var_kp Name of force kept variables, default is NULL.
-#' @param return_rm_reason Logical, default is FALSE.
-#' @param positive Value of positive class, default is "bad|1".
+#' @param x Name of x variables. Defaults to NULL. If x is NULL, then all columns except y are counted as x variables.
+#' @param iv_limit The information value of kept variables should >= iv_limit. The Defaults to 0.02.
+#' @param missing_limit The missing rate of kept variables should <= missing_limit. The Defaults to 0.95.
+#' @param identical_limit The identical value rate (excluding NAs) of kept variables should <= identical_limit. The Defaults to 0.95.
+#' @param var_rm Name of force removed variables, Defaults to NULL.
+#' @param var_kp Name of force kept variables, Defaults to NULL.
+#' @param return_rm_reason Logical, Defaults to FALSE.
+#' @param positive Value of positive class, Defaults to "bad|1".
 #'
 #' @return A data frame with columns for y and selected x variables, and a data frame with columns for remove reason if return_rm_reason == TRUE.
 #'
@@ -40,7 +40,10 @@
 #' @import data.table
 #' @export
 #'
-var_filter = function(dt, y, x = NULL, iv_limit = 0.02, missing_limit = 0.95, identical_limit = 0.95, var_rm = NULL, var_kp = NULL, return_rm_reason = FALSE, positive = "bad|1") {
+var_filter = function(
+  dt, y, x = NULL,
+  iv_limit = 0.02, missing_limit = 0.95, identical_limit = 0.95,
+  var_rm = NULL, var_kp = NULL, return_rm_reason = FALSE, positive = "bad|1") {
   # start time
   start_time = proc.time()
   cat('[INFO] filtering variables ... \n')
@@ -136,5 +139,61 @@ var_filter = function(dt, y, x = NULL, iv_limit = 0.02, missing_limit = 0.95, id
   if (rs[3] > 10) cat(sprintf("[INFO] Variable filtering on %s rows and %s columns in %s \n%s variables are removed", nrow(dt),ncol(dt),sec_to_hms(rs[3]), ncol(dt)-length(x_selected)-1),"\n")
 
   return(rt)
+}
+
+
+
+#' @importFrom stats step
+var_filter_step = function(dt, y='label', x=NULL, show_vif=TRUE) {
+  dt = setDT(copy(dt))
+  if (is.null(x)) x = setdiff(names(dt), y)
+
+  m1 = glm(as.formula(sprintf('%s ~ .', y)), family = "binomial", data = dt[, c(x, y), with = FALSE])
+
+  m_step = step(m1, direction="both", trace = FALSE)
+  m2 = eval(m_step$call)
+  df_vif = vif(m1, merge_coef = TRUE)
+
+  if (show_vif) print(df_vif)
+
+  x_selected = names(coef(m2))[-1]
+  return(x_selected)
+}
+
+
+
+var_filter_vif = function(dt, y='label', x=NULL, vif_limit = 3, coef_limit = NULL, show_vif=TRUE) {
+  Estimate = variable = gvif = NULL
+
+  dt = setDT(copy(dt))
+  if (is.null(x)) x = setdiff(names(dt), y)
+
+  m1 = glm(as.formula(sprintf('%s ~ .', y)), family = "binomial", data = dt[, unique(c(x,y)), with = FALSE])
+  df_vif = vif(m1, merge_coef = TRUE)
+
+
+  # coefficients
+  if (!is.null(coef_limit)) {
+    while (df_vif[-1][Estimate < coef_limit, .N>0]) {
+      x = setdiff(x, df_vif[-1][Estimate < 0,][order(-gvif)][1,variable])
+
+      m1 = glm(as.formula(sprintf('%s ~ .', y)), family = "binomial", data = dt[, unique(c(x,y)), with = FALSE])
+      df_vif = vif(m1, merge_coef = TRUE)
+    }
+  }
+
+
+  # vif
+  while (df_vif[gvif >= vif_limit, .N>0]) {
+    x = setdiff(x, df_vif[-1][gvif == max(gvif), variable])
+
+    m1 = glm(as.formula(sprintf('%s ~ .', y)), family = "binomial", data = dt[, unique(c(x,y)), with = FALSE])
+    df_vif = vif(m1, merge_coef = TRUE)
+  }
+
+
+  if (show_vif) print(df_vif)
+  x_selected = names(coef(m1))[-1]
+  return(x_selected)
 }
 

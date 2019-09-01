@@ -1,7 +1,7 @@
 # woebin woebin_plot woebin_ply woebin_adj
 
 # converting vector (breaks & special_values) to data frame
-split_vec_todf = function(vec) {
+split_vec2df = function(vec) {
   value = . = bin_chr = V1 = NULL
 
   if (!is.null(vec)) data.table(
@@ -30,7 +30,7 @@ dtm_binning_sv = function(dtm, breaks, spl_val) {
   spl_val = add_missing_spl_val(dtm, breaks, spl_val)
   if (!is.null(spl_val)) {
     # special_values from vector to data frame
-    sv_df = split_vec_todf(spl_val)
+    sv_df = split_vec2df(spl_val)
 
     # dtm_sv & dtm
     dtm_sv = setDT(dtm)[value %in% sv_df$value]
@@ -49,6 +49,7 @@ dtm_binning_sv = function(dtm, breaks, spl_val) {
 
   return(list(binning_sv=binning_sv, dtm=dtm))
 }
+
 
 # check empty bins for unmeric variable
 check_empty_bins = function(dtm, binning) {
@@ -70,7 +71,6 @@ check_empty_bins = function(dtm, binning) {
   }
   return(binning)
 }
-
 # check zero in good bad, remove bins that have zeros in good or bad column
 check_zero_goodbad = function(dtm, binning, count_distr_limit = NULL) {
   brkp = good = bad = count = merge_tolead = count_lag = count_lead = brkp2 = . = variable = bin = badprob = value = NULL
@@ -106,7 +106,6 @@ check_zero_goodbad = function(dtm, binning, count_distr_limit = NULL) {
   }
   return(binning)
 }
-
 # check count distri, remove bins that count_distribution rate less than count_distr_limit
 check_count_distri = function(dtm, binning, count_distr_limit) {
   count_distr = count = good = bad = brkp = merge_tolead = count_lag = count_lead = brkp2 = . = variable = bin = value = NULL
@@ -153,7 +152,7 @@ woebin2_breaks = function(dtm, breaks, spl_val) {
   value = bin = . = y = variable = count = bad = good = V1 = badprob = bksv_list = bin_chr = NULL
 
   # breaks from vector to data frame
-  bk_df = split_vec_todf(breaks)
+  bk_df = split_vec2df(breaks)
 
   # dtm $ binning_sv
   dtm_binsv_list = dtm_binning_sv(dtm, breaks, spl_val)
@@ -297,6 +296,7 @@ woebin2_init_bin = function(dtm, init_count_distr, breaks, spl_val) {
   return(list(binning_sv=binning_sv, initial_binning=init_bin))
 }
 
+
 # required in woebin2_tree # add 1 best break for tree-like binning
 woebin2_tree_add_1brkp = function(dtm, initial_binning, count_distr_limit, bestbreaks=NULL) {
   # global variables or functions
@@ -365,14 +365,15 @@ woebin2_tree_add_1brkp = function(dtm, initial_binning, count_distr_limit, bestb
   total_iv_all_brks = total_iv_all_breaks(initial_binning, bestbreaks, dtm_rows)
 
   # bestbreaks: total_iv == max(total_iv) & min(count_distr) >= count_distr_limit
-  bstbrk_max_iv = total_iv_all_brks[min_count_distr >= count_distr_limit][total_iv==max(total_iv)][, bstbin]
-  # add 1best break to bestbreaks
-  bestbreaks = unique(c(bestbreaks, bstbrk_max_iv[1]))
-  bin_add_1bst = binning_add_1bst(initial_binning, bestbreaks)
+  if (total_iv_all_brks[min_count_distr >= count_distr_limit, .N > 0]) {
+    bstbrk_max_iv = total_iv_all_brks[min_count_distr >= count_distr_limit][total_iv==max(total_iv)][, bstbin]
+    # add 1best break to bestbreaks
+    bestbreaks = unique(c(bestbreaks, bstbrk_max_iv[1]))
+  }
 
+  bin_add_1bst = binning_add_1bst(initial_binning, bestbreaks)
   return(bin_add_1bst)
 }
-
 # required in woebin2 # return tree-like binning
 woebin2_tree = function(
   dtm,
@@ -495,7 +496,7 @@ woebin2_chimerge = function(
   binning_chisq = add_chisq(initial_binning)
 
   # param
-  bin_chisq_min = binning_chisq[, min(chisq, na.rm = TRUE)]
+  bin_chisq_min = binning_chisq[!is.na(chisq), min(chisq)]
   bin_count_distr_min = binning_chisq[!is.na(brkp), min((good+bad)/dtm_rows)]
   bin_nrow = binning_chisq[,.N]
   # remove brkp if chisq < chisq_limit
@@ -532,8 +533,8 @@ woebin2_chimerge = function(
     binning_chisq = add_chisq(binning_chisq)
     ## param
     bin_nrow = binning_chisq[,.N]
-    if (bin_nrow == 1) break
-    bin_chisq_min = binning_chisq[, min(chisq, na.rm = TRUE)]
+    if (bin_nrow == 1 || binning_chisq[!is.na(chisq), .N==0]) break
+    bin_chisq_min = binning_chisq[!is.na(chisq), min(chisq)]
     bin_count_distr_min = binning_chisq[!is.na(brkp), min((good+bad)/dtm_rows)]
   }
 
@@ -712,7 +713,7 @@ bins_to_breaks = function(bins, dt, to_string=FALSE, save_name=NULL) {
   return(bins_breakslist)
 }
 
-# @param init_count_distr The minimum percentage of initial binning class number over total. Accepted range: 0.01-0.2; default is 0.02, which means initial cut into 50 fine bins for continuous variables.
+# @param init_count_distr The minimum percentage of initial binning class number over total. Accepted range: 0.01-0.2; Defaults to 0.02, which means initial cut into 50 fine bins for continuous variables.
 
 #' WOE Binning
 #'
@@ -720,23 +721,23 @@ bins_to_breaks = function(bins, dt, to_string=FALSE, save_name=NULL) {
 #'
 #' @param dt A data frame with both x (predictor/feature) and y (response/label) variables.
 #' @param y Name of y variable.
-#' @param x Name of x variables. Default is NULL. If x is NULL, then all columns except y and var_skip are counted as x variables.
-#' @param var_skip Name of variables that will skip for binning. Default is NULL.
-#' @param breaks_list List of break points, default is NULL. If it is not NULL, variable binning will based on the provided breaks.
-#' @param special_values the values specified in special_values will be in separate bins. Default is NULL.
-#' @param stop_limit Stop binning segmentation when information value gain ratio less than the 'stop_limit' if using tree method; or stop binning merge when the chi-square of each neighbor bins are larger than the threshold under significance level of 'stop_limit' and freedom degree of 1 if using chimerge method. Accepted range: 0-0.5; default is 0.1. If it is 'N', each x value is a bin.
+#' @param x Name of x variables. Defaults to NULL. If x is NULL, then all columns except y and var_skip are counted as x variables.
+#' @param var_skip Name of variables that will skip for binning. Defaults to NULL.
+#' @param breaks_list List of break points, Defaults to NULL. If it is not NULL, variable binning will based on the provided breaks.
+#' @param special_values the values specified in special_values will be in separate bins. Defaults to NULL.
+#' @param stop_limit Stop binning segmentation when information value gain ratio less than the 'stop_limit' if using tree method; or stop binning merge when the chi-square of each neighbor bins are larger than the threshold under significance level of 'stop_limit' and freedom degree of 1 if using chimerge method. Accepted range: 0-0.5; Defaults to 0.1. If it is 'N', each x value is a bin.
 # 'qchisq(1-stoplimit, 1)'
-#' @param count_distr_limit The minimum count distribution percentage. Accepted range: 0.01-0.2; default is 0.05.
-#' @param bin_num_limit Integer. The maximum number of binning. Default is 8.
-#' @param positive Value of positive class, default "bad|1".
-#' @param no_cores Number of CPU cores for parallel computation. Defaults NULL. If no_cores is NULL, the no_cores will set as 1 if length of x variables less than 10, and will set as the number of all CPU cores if the length of x variables greater than or equal to 10.
-#' @param print_step A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.
-#' @param method Four methods are provided, "tree" and "chimerge" for optimal binning that support both numerical and categorical variables, and 'width' and 'freq' for equal binning that support numerical variables only. Default is "tree".
-#' @param save_breaks_list A string. The file name to save breaks_list. Default is None.
-#' @param ignore_const_cols Logical. Ignore constant columns. Default is TRUE.
-#' @param ignore_datetime_cols Logical. Ignore datetime columns. Default is TRUE.
-#' @param check_cate_num Logical. Check whether the number of unique values in categorical columns larger than 50. It might make the binning process slow if there are too many unique categories. Default is TRUE.
-#' @param replace_blank_na Logical. Replace blank values with NA. Default is TRUE.
+#' @param count_distr_limit The minimum count distribution percentage. Accepted range: 0.01-0.2; Defaults to 0.05.
+#' @param bin_num_limit Integer. The maximum number of binning. Defaults to 8.
+#' @param positive Value of positive class, defaults to "bad|1".
+#' @param no_cores Number of CPU cores for parallel computation. Defaults to 90 percent of total cpu cores.
+#' @param print_step A non-negative integer. Defaults to 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.
+#' @param method Four methods are provided, "tree" and "chimerge" for optimal binning that support both numerical and categorical variables, and 'width' and 'freq' for equal binning that support numerical variables only. Defaults to "tree".
+#' @param save_breaks_list A string. The file name to save breaks_list. Defaults to None.
+#' @param ignore_const_cols Logical. Ignore constant columns. Defaults to TRUE.
+#' @param ignore_datetime_cols Logical. Ignore datetime columns. Defaults to TRUE.
+#' @param check_cate_num Logical. Check whether the number of unique values in categorical columns larger than 50. It might make the binning process slow if there are too many unique categories. Defaults to TRUE.
+#' @param replace_blank_inf Logical. Replace blank values with NA and infinite with -1. Defaults to TRUE.
 #' @param ... Additional parameters.
 #'
 #' @return A list of data frames include binning information for each x variables.
@@ -817,7 +818,13 @@ bins_to_breaks = function(bins, dt, to_string=FALSE, save_name=NULL) {
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
 #' @importFrom parallel detectCores makeCluster stopCluster
 #' @export
-woebin = function(dt, y, x=NULL, var_skip=NULL, breaks_list=NULL, special_values=NULL, stop_limit=0.1, count_distr_limit=0.05, bin_num_limit=8, positive="bad|1", no_cores=NULL, print_step=0L, method="tree", save_breaks_list=NULL, ignore_const_cols=TRUE, ignore_datetime_cols=TRUE, check_cate_num=TRUE, replace_blank_na=TRUE, ...) {
+woebin = function(
+  dt, y, x=NULL,
+  var_skip=NULL, breaks_list=NULL, special_values=NULL,
+  stop_limit=0.1, count_distr_limit=0.05, bin_num_limit=8,
+  positive="bad|1", no_cores=NULL, print_step=0L,
+  method="tree", save_breaks_list=NULL,
+  ignore_const_cols=TRUE, ignore_datetime_cols=TRUE, check_cate_num=TRUE, replace_blank_inf=TRUE, ...) {
   # start time
   start_time = proc.time()
 
@@ -856,7 +863,7 @@ woebin = function(dt, y, x=NULL, var_skip=NULL, breaks_list=NULL, special_values
   # check categorical columns' unique values
   if (check_cate_num) check_cateCols_uniqueValues(dt, var_skip)
   # replace black with na
-  if (replace_blank_na) dt = rep_blank_na(dt)
+  if (replace_blank_inf) dt = rep_blank_na(dt)
   # x variable names
   xs = x_variable(dt, y, x, var_skip)
   xs_len = length(xs)
@@ -895,17 +902,20 @@ woebin = function(dt, y, x=NULL, var_skip=NULL, breaks_list=NULL, special_values
   if (is.null(y) & !(method %in% c('freq', 'width'))) method = 'freq'
 
   # binning ------
-  # loop on xs 
+  # loop on xs
   # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
   # https://privefl.github.io/blog/a-guide-to-parallelism-in-r/
-  if (is.null(no_cores) || no_cores<1) {
-    no_cores = ifelse(xs_len < 10, 1, detectCores(logical=F))
+
+  if (!is.numeric(no_cores) || no_cores<1) {
+    all_cores = detectCores(logical=F)-1
+    no_cores = ceiling(ifelse(xs_len/5 < all_cores, xs_len/5, all_cores*0.9))
   }
 
   bins = list()
   if (!is.null(y)) {
     ycol = dt[[y]]
   } else ycol = NA
+
   if (no_cores == 1) {
     for (i in 1:xs_len) {
       x_i = xs[i]
@@ -927,8 +937,8 @@ woebin = function(dt, y, x=NULL, var_skip=NULL, breaks_list=NULL, special_values
     }
 
   } else {
-    type_psock_fork = ifelse(Sys.info()["sysname"] == 'Windows', 'PSOCK', 'FORK')
-    cl = makeCluster(no_cores, type = type_psock_fork)
+    # type_psock_fork = ifelse(Sys.info()["sysname"] == 'Windows', 'PSOCK', 'FORK')
+    cl = makeCluster(no_cores)#, type = type_psock_fork)
     registerDoParallel(cl)
     # registerDoParallel(no_cores)
     # run
@@ -944,7 +954,7 @@ woebin = function(dt, y, x=NULL, var_skip=NULL, breaks_list=NULL, special_values
           if (xs_len==1) bs = list(bs)
           setNames(bs, xs)
         }#,
-        # .export = c('dt', 'xs', 'y', 'breaks_list', 'special_values', 'init_count_distr', 'count_distr_limit', 'stop_limit', 'bin_num_limit', 'method')
+        # .export = c('dt', 'xs', 'ycol', 'breaks_list', 'special_values', 'init_count_distr', 'count_distr_limit', 'stop_limit', 'bin_num_limit', 'method')
       ) %dopar% {
         x_i = xs[i]
 
@@ -1022,15 +1032,16 @@ woepoints_ply1 = function(dtx, binx, x_i, woe_points) {
 
   return(dtx_suffix)
 }
+
 #' WOE Transformation
 #'
 #' \code{woebin_ply} converts original input data into woe values based on the binning information generated from \code{woebin}.
 #'
 #' @param dt A data frame.
 #' @param bins Binning information generated from \code{woebin}.
-#' @param no_cores Number of CPU cores for parallel computation. Defaults NULL. If no_cores is NULL, the no_cores will set as 1 if length of x variables less than 10, and will set as the number of all CPU cores if the length of x variables greater than or equal to 10.
-#' @param print_step A non-negative integer. Default is 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.
-#' @param replace_blank_na Logical. Replace blank values with NA. Default is TRUE. This argument should be the same with \code{woebin}'s.
+#' @param no_cores Number of CPU cores for parallel computation. Defaults to 90 percent of total cpu cores.
+#' @param print_step A non-negative integer. Defaults to 1. If print_step>0, print variable names by each print_step-th iteration. If print_step=0 or no_cores>1, no message is print.
+#' @param replace_blank_inf Logical. Replace blank values with NA and infinite with -1. Defaults to TRUE. This argument should be the same with \code{woebin}'s.
 #' @param ... Additional parameters.
 #'
 #' @return A data frame with columns for variables converted into woe values.
@@ -1071,7 +1082,7 @@ woepoints_ply1 = function(dtx, binx, x_i, woe_points) {
 #' @import data.table
 #' @export
 #'
-woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L, replace_blank_na=TRUE, ...) {
+woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L, replace_blank_inf=TRUE, ...) {
   # start time
   start_time = proc.time()
 
@@ -1091,7 +1102,7 @@ woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L, replace_blank_na=T
   # # remove date/time col
   # dt = rmcol_datetime_unique1(dt)
   # replace "" by NA
-  if (replace_blank_na) dt = rep_blank_na(dt)
+  if (replace_blank_inf) dt = rep_blank_na(dt)
   # print_step
   print_step = check_print_step(print_step)
 
@@ -1114,8 +1125,9 @@ woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L, replace_blank_na=T
   # the databc_colomun_placeholder will be remove in the result, in case dt_init is an empty dataframe
 
   # loop on xs # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
-  if (is.null(no_cores)) {
-    no_cores = ifelse(xs_len < 10, 1, detectCores(logical=F))
+  if (!is.numeric(no_cores) || no_cores <1) {
+    all_cores = detectCores(logical=F)-1
+    no_cores = ceiling(ifelse(xs_len/5 < all_cores, xs_len/5, all_cores*0.9))
   }
 
   if (no_cores == 1) {
@@ -1131,8 +1143,8 @@ woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L, replace_blank_na=T
       dat = cbind(dat, woepoints_ply1(dtx, binx, x_i, woe_points=value))
     }
   } else {
-    type_psock_fork = ifelse(Sys.info()["sysname"] == 'Windows', 'PSOCK', 'FORK')
-    cl = makeCluster(no_cores, type = type_psock_fork)
+    # type_psock_fork = ifelse(Sys.info()["sysname"] == 'Windows', 'PSOCK', 'FORK')
+    cl = makeCluster(no_cores)#, type = type_psock_fork)
     registerDoParallel(cl)
     # registerDoParallel(no_cores)
     # run
@@ -1168,22 +1180,31 @@ woebin_ply = function(dt, bins, no_cores=NULL, print_step=0L, replace_blank_na=T
 
 # required in woebin_plot
 #' @import data.table ggplot2
-plot_bin = function(bin, title, show_iv, line_color = 'blue', bar_color = NULL) {
+plot_bin = function(bin, title, show_iv, line_value = 'badprob', line_color = 'blue', bar_color = NULL) {
   # global variables or functions
-  . = bad = badprob = badprob2 = count = count_distr = count_distr2 = count_num = good = goodbad = total_iv = value = variable = woe = NULL
+  . = bad = badprob = badprob2 = count = count_distr = count_distr2 = count_num = good = goodbad = total_iv = value = variable = woe = lin_val = lin_val2 = lin_val_label = NULL
 
   if ( all(is.na(bin$good)) || all(is.na(bin$bad)) ) return(NULL)
   # data
   ## y_right_max
-  y_right_max = ceiling(max(bin$badprob, na.rm=T)*10)
-  if (y_right_max %% 2 ==1) y_right_max=y_right_max+1
-  if (y_right_max - max(bin$badprob, na.rm=T)*10 <= 0.3) y_right_max = y_right_max+2
-  y_right_max = y_right_max/10
-  if (y_right_max>1 || y_right_max<=0 || is.na(y_right_max) || is.null(y_right_max)) y_right_max=1
+  if (line_value == 'badprob') {
+    y_right_max = ceiling(max(bin[[line_value]], na.rm=T)*10)
+    if (y_right_max %% 2 ==1) y_right_max=y_right_max+1
+    if (y_right_max - max(bin[[line_value]], na.rm=T)*10 <= 0.3) y_right_max = y_right_max+2
+    y_right_max = y_right_max/10
+    if (y_right_max>1 || y_right_max<=0 || is.na(y_right_max) || is.null(y_right_max)) y_right_max=1
+  } else {
+    y_right_max = max(bin[[line_value]])
+  }
+  ## y_right_min
+  y_right_min = ifelse(line_value == 'badprob', 0, min(bin[[line_value]]))
+  ## y_right_name
+  y_right_name = ifelse(line_value == 'badprob', 'Bad probability', 'woe')
 
   ## y_left_max
   y_left_max = ceiling(max(bin$count_distr, na.rm=T)*10)/10
-  if (y_left_max>1 || y_left_max<=0 || is.na(y_left_max) || is.null(y_left_max)) y_left_max=1
+  if (y_left_max>1 || y_left_max<=0 || is.na(y_left_max) || is.null(y_left_max)) y_left_max = 1
+
 
 
   ## data set
@@ -1192,14 +1213,19 @@ plot_bin = function(bin, title, show_iv, line_color = 'blue', bar_color = NULL) 
     variable, bin, count_num=count, count_distr2=count_distr, count_distr, good=good/sum(count), bad=bad/sum(count), badprob, woe
   )][, `:=`(
     bin = ifelse(is.na(bin), "NA", bin),
-    badprob2 = badprob*(y_left_max/y_right_max),
-    badprob = round(badprob,4),
+    lin_val2 = (get(line_value)-y_right_min)*(y_left_max/(y_right_max-y_right_min)),
+    lin_val = round(get(line_value),4),
     rowid = .I
-  )][, bin := factor(bin, levels = bin)]
+  )][, `:=`(
+    bin = factor(bin, levels = bin),
+    lin_val_label = paste0(round(lin_val*100, 1), "%")
+  )][]
+  if (line_value == 'woe') dat = dat[, lin_val_label := round(lin_val, 2)]
+
+
 
   dat_melt = melt(dat, id.vars = c("variable", "bin","rowid"), measure.vars =c("good", "bad"), variable.name = "goodbad")[
-    ,goodbad:=factor(goodbad, levels=c( "bad", "good"))
-    ]
+    ,goodbad:=factor(goodbad, levels=c( "bad", "good")) ]
 
   # title
   if (!is.null(title)) title = paste0(title, "-")
@@ -1215,17 +1241,17 @@ plot_bin = function(bin, title, show_iv, line_color = 'blue', bar_color = NULL) 
     # coord_cartesian(clip = 'off') +
     geom_bar(data=dat_melt, aes(x=bin, y=value, fill=goodbad), stat="identity") +
     geom_text(data=dat, aes(x = bin, y = count_distr2, label = paste0(round(count_distr2*100, 1), "%, ", count_num) ), vjust = 0.5) +
-    geom_line(data=dat, aes(x = rowid, y = badprob2), colour = line_color) +
-    geom_point(data=dat, aes(x = rowid, y=badprob2), colour = line_color, shape=21, fill="white") +
-    geom_text(data=dat, aes(x = rowid, y = badprob2, label = paste0(round(badprob*100, 1), "%")), colour=line_color, vjust = -0.5) +
-    scale_y_continuous(limits = c(0,y_left_max), sec.axis = sec_axis(~./(y_left_max/y_right_max), name = "Bad probability")) +
-    labs(title = title_string, x=NULL, y="Bin count distribution", fill=NULL) +
+    geom_line(data=dat, aes(x = rowid, y = lin_val2), colour = line_color) +
+    geom_point(data=dat, aes(x = rowid, y = lin_val2), colour = line_color, shape=21, fill="white") +
+    geom_text(data=dat, aes(x = rowid, y = lin_val2, label = lin_val_label), colour = line_color, vjust = -0.5) +
+    scale_y_continuous(limits = c(0, y_left_max), sec.axis = sec_axis(~./(y_left_max/(y_right_max-y_right_min))+y_right_min, name = y_right_name)) +
+    labs(title = title_string, x=NULL, y = "Bin count distribution", fill=NULL) +
     theme_bw() +
     theme(
       legend.position="bottom", legend.direction="horizontal",
       axis.title.y.right = element_text(colour = line_color),
-      axis.text.y.right  = element_text(colour = line_color,angle=90, hjust = 0.5),
-      axis.text.y = element_text(angle=90, hjust = 0.5) )
+      axis.text.y.right  = element_text(colour = line_color, angle = 90, hjust = 0.5),
+      axis.text.y = element_text(angle = 90, hjust = 0.5) )
 
   if (!is.null(bar_color)) p_bin = p_bin + scale_fill_manual(values= bar_color)
 
@@ -1237,9 +1263,10 @@ plot_bin = function(bin, title, show_iv, line_color = 'blue', bar_color = NULL) 
 #'
 #' @name woebin_plot
 #' @param bins A list of data frames. Binning information generated by \code{woebin}.
-#' @param x Name of x variables. Default is NULL. If x is NULL, then all columns except y are counted as x variables.
-#' @param title String added to the plot title. Default is NULL.
-#' @param show_iv Logical. Default is TRUE, which means show information value in the plot title.
+#' @param x Name of x variables. Defaults to NULL. If x is NULL, then all columns except y are counted as x variables.
+#' @param title String added to the plot title. Defaults to NULL.
+#' @param show_iv Logical. Defaults to TRUE, which means show information value in the plot title.
+#' @param line_value The value displayed as line. Accepted values are 'badprob' and 'woe'. Defaults to bad probability.
 #' @param ... Additional parameters
 #'
 #' @return A list of binning graphics.
@@ -1255,6 +1282,11 @@ plot_bin = function(bin, title, show_iv, line_color = 'blue', bar_color = NULL) 
 #'
 #' p1 = woebin_plot(bins1)
 #' print(p1)
+#'
+#' # modify line value
+#' p1_w = woebin_plot(bins1, line_value = 'woe')
+#' print(p1_w)
+#'
 #' # modify colors
 #' p1_c = woebin_plot(bins1, line_color='#FC8D59', bar_color=c('#FFFFBF', '#99D594'))
 #' print(p1_c)
@@ -1276,11 +1308,13 @@ plot_bin = function(bin, title, show_iv, line_color = 'blue', bar_color = NULL) 
 #' @import data.table ggplot2
 #' @export
 #'
-woebin_plot = function(bins, x=NULL, title=NULL, show_iv = TRUE, ...) {
+woebin_plot = function(bins, x=NULL, title=NULL, show_iv = TRUE, line_value = 'badprob', ...) {
   # global variables or functions
   variable = NULL
   xs = x
 
+  # line value
+  if (!(line_value %in% c('badprob', 'woe'))) line_value = 'badprob'
   # line bar colors
   line_color = list(...)[['line_color']]
   if (is.null(line_color)) line_color = 'blue'
@@ -1296,7 +1330,7 @@ woebin_plot = function(bins, x=NULL, title=NULL, show_iv = TRUE, ...) {
 
   # plot export
   plotlist = list()
-  for (i in xs) plotlist[[i]] = plot_bin(bins[variable==i], title, show_iv, line_color = line_color, bar_color = bar_color)
+  for (i in xs) plotlist[[i]] = plot_bin(bins[variable==i], title, show_iv, line_value = line_value,  line_color = line_color, bar_color = bar_color)
 
 
   return(plotlist)
@@ -1379,11 +1413,11 @@ woebin_adj_break_plot = function(dt, y, x_i, breaks, stop_limit, sv_i, method) {
 #' @param dt A data frame.
 #' @param y Name of y variable.
 #' @param bins A list of data frames. Binning information generated from \code{woebin}.
-#' @param adj_all_var Logical, whether to show variables have monotonic woe trends. Default is TRUE
-#' @param special_values The values specified in special_values will in separate bins. Default is NULL.
-#' @param method Optimal binning method, it should be "tree" or "chimerge". Default is "tree".
-#' @param save_breaks_list A string. The file name to save breaks_list. Default is None.
-#' @param count_distr_limit The minimum count distribution percentage. Accepted range: 0.01-0.2; default is 0.05. This argument should be the same with woebin's.
+#' @param adj_all_var Logical, whether to show variables have monotonic woe trends. Defaults to TRUE
+#' @param special_values The values specified in special_values will in separate bins. Defaults to NULL.
+#' @param method Optimal binning method, it should be "tree" or "chimerge". Defaults to "tree".
+#' @param save_breaks_list A string. The file name to save breaks_list. Defaults to None.
+#' @param count_distr_limit The minimum count distribution percentage. Accepted range: 0.01-0.2; Defaults to 0.05. This argument should be the same with woebin's.
 #' @param ... Additional parameters.
 #'
 #' @return A list of modified break points of each x variables.
@@ -1440,7 +1474,7 @@ woebin_adj = function(dt, y, bins, adj_all_var=TRUE, special_values=NULL, method
   # stop_limit
   stop_limit = 0.1
   if ('stop_limit' %in% names(list(...))) stop_limit = list(...)[['stop_limit']]
-    print(stop_limit)
+    # print(stop_limit)
   stop_limit = check_stop_limit(stop_limit, xs_adj)
 
   # breakslist of bins
@@ -1481,18 +1515,22 @@ woebin_adj = function(dt, y, bins, adj_all_var=TRUE, special_values=NULL, method
     # adjusting breaks ------
     adj_brk = menu2(choices = c("next", "yes", "back"), title=paste0("> Adjust breaks for (", i, "/", xs_len, ") ", x_i, "?"))
 
-    while (adj_brk == 2) {
-      stp_lmt = stop_limit[[x_i]]
+    while (adj_brk == 2 || adj_brk == 'save') {
+      if (adj_brk == 2) {
+        stp_lmt = stop_limit[[x_i]]
+        # modify breaks adj_brk == 2
+        breaks = readline("> Enter modified breaks: ")
+        breaks = gsub("^[,\\.]+|[,\\.]+$", "", breaks)
+        if (breaks == "N") {
+          stp_lmt = "N"
+          breaks = NULL
+        }
 
-      # modify breaks adj_brk == 2
-      breaks = readline("> Enter modified breaks: ")
-      breaks = gsub("^[,\\.]+|[,\\.]+$", "", breaks)
-      if (breaks == "N") {
-        stp_lmt = "N"
-        breaks = NULL
+        breaks <- try(woebin_adj_break_plot(dt, y, x_i, breaks, stp_lmt, sv_i, method=method), silent = TRUE)
+      } else { # adj_brk == 'save'
+        save_name = ifelse(is.null(save_breaks_list), 'brk_lst', save_breaks_list)
+        save_brk_lst(bin_brk2txt(bins_breakslist), save_name)
       }
-
-      breaks <- try(woebin_adj_break_plot(dt, y, x_i, breaks, stp_lmt, sv_i, method=method), silent = TRUE)
 
       adj_brk = menu2(c("next", "yes", "back"), title=paste0("> Adjust breaks for (", i, "/", xs_len, ") ", x_i, "?"))
     }
@@ -1504,9 +1542,6 @@ woebin_adj = function(dt, y, bins, adj_all_var=TRUE, special_values=NULL, method
       # go next adj_brk == 1
       if (!(is.null(breaks) || breaks == "")) bins_breakslist[variable == x_i][["x_breaks"]]  <- breaks
     i = i + 1
-    } else if (adj_brk == 'save') {
-      save_name = ifelse(is.null(save_breaks_list), 'brk_lst', save_breaks_list)
-      save_brk_lst(bin_brk2txt(bins_breakslist), save_name)
     } else if (grepl('^go[1-9][0-9]*$', adj_brk)) {
       i = as.integer(sub('go','', adj_brk))
     }

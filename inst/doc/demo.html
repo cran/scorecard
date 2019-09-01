@@ -7,12 +7,13 @@
 <meta charset="utf-8" />
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <meta name="author" content="shichen xie" />
 
-<meta name="date" content="2019-07-04" />
+<meta name="date" content="2019-09-01" />
 
 <title>Developing a Credit Scorcard</title>
 
@@ -96,7 +97,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
       if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' || rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -303,7 +304,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 
 <h1 class="title toc-ignore">Developing a Credit Scorcard</h1>
 <h4 class="author">shichen xie</h4>
-<h4 class="date">2019-07-04</h4>
+<h4 class="date">2019-09-01</h4>
 
 
 
@@ -365,6 +366,9 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 <a class="sourceLine" id="cb1-56" data-line-number="56"><span class="co">## psi</span></a>
 <a class="sourceLine" id="cb1-57" data-line-number="57"><span class="kw">perf_psi</span>(<span class="dt">score =</span> score_list, <span class="dt">label =</span> label_list)</a></code></pre></div>
 
+
+
+<!-- code folding -->
 
 
 <!-- dynamically load mathjax for compatibility with self-contained -->
