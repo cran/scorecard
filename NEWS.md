@@ -1,3 +1,8 @@
+# scorecard 0.2.7
+
+* check var_kp in scorecard_ply function
+* fixed a bug caused by data.table updating
+
 # scorecard 0.2.6
 
 * split_df function supports multiple data frames.

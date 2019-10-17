@@ -16,7 +16,7 @@
 #'
 #' library(data.table)
 #' dat = rbind(
-#'   germancredit[, c(sample(20,3),21)],
+#'   setDT(germancredit)[, c(sample(20,3),21)],
 #'   data.table(creditability=sample(c("good","bad"),10,replace=TRUE)),
 #'   fill=TRUE)
 #'
@@ -126,3 +126,9 @@ one_hot = function(dt, var_skip = NULL, var_encode = NULL, nacol_rm = FALSE, rep
 
   return(dt_new[])
 }
+
+
+# missing value imputation
+# feature scaling (standardization, normalization)
+# box-cox transformation
+#
