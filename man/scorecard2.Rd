@@ -4,8 +4,9 @@
 \alias{scorecard2}
 \title{Creating a Scorecard}
 \usage{
-scorecard2(bins, dt, y, x = NULL, points0 = 600, odds0 = 1/19,
-  pdo = 50, basepoints_eq0 = FALSE, positive = "bad|1", ...)
+scorecard2(bins, dt, y, x = NULL, badprob_pop = NULL, points0 = 600,
+  odds0 = 1/19, pdo = 50, basepoints_eq0 = FALSE, return_prob = FALSE,
+  positive = "bad|1", ...)
 }
 \arguments{
 \item{bins}{Binning information generated from \code{woebin} function.}
@@ -16,23 +17,27 @@ scorecard2(bins, dt, y, x = NULL, points0 = 600, odds0 = 1/19,
 
 \item{x}{Name of x variables. If it is NULL, then all variables in bins are used. Defaults to NULL.}
 
+\item{badprob_pop}{Bad probability of population. Accepted range: 0-1,  default to NULL. If it is not NULL, the model will adjust for oversampling.}
+
 \item{points0}{Target points, default 600.}
 
 \item{odds0}{Target odds, default 1/19. Odds = p/(1-p).}
 
 \item{pdo}{Points to Double the Odds, default 50.}
 
-\item{basepoints_eq0}{Logical, Defaults to FALSE. If it is TRUE, the basepoints will equally distribute to each variable.}
+\item{basepoints_eq0}{Logical, defaults to FALSE. If it is TRUE, the basepoints will equally distribute to each variable.}
+
+\item{return_prob}{Logical, defaults to FALSE. If it is TRUE, the predict probability will also return.}
 
 \item{positive}{Value of positive class, default "bad|1".}
 
 \item{...}{Additional parameters.}
 }
 \value{
-A scorecard data frame
+A list of scorecard data frames
 }
 \description{
-\code{scorecard2} creates a scorecard based on the results from \code{woebin}. It has the same function with \code{scorecard}, but without model object input.
+\code{scorecard2} creates a scorecard based on the results from \code{woebin}. It has the same function of \code{scorecard}, but without model object input and provided adjustment for oversampling.
 }
 \examples{
 \donttest{
@@ -66,11 +71,7 @@ m = eval(m_step$call)
 # Example I # creat a scorecard
 card = scorecard(bins, m)
 card2 = scorecard2(bins=bins, dt=germancredit, y='creditability',
-  x=c("status.of.existing.checking.account", "duration.in.month", "credit.history",
-   "purpose", "credit.amount", "savings.account.and.bonds",
-   "present.employment.since", "installment.rate.in.percentage.of.disposable.income",
-   "personal.status.and.sex", "other.debtors.or.guarantors", "property",
-   "age.in.years", "other.installment.plans", "housing"))
+  x= sub('_woe', '', names(coef(m))[-1]))
 
 # credit score
 # Example I # only total score

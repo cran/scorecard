@@ -751,8 +751,9 @@ pf_cutoffs = function(dt_ev_lst) {
 perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'logloss', 'r2', 'ks', 'auc', 'gini'), confusion_matrix=TRUE, threshold=NULL, show_plot=c('ks', 'roc'), positive="bad|1", ...) {
   . = f1 = NULL
 
+  kwargs = list(...)
   # arguments
-  seed = list(...)[['seed']]
+  seed = kwargs[['seed']]
   if (is.null(seed)) seed = 618
 
   # list of data with label and pred
@@ -813,14 +814,14 @@ perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'l
   # title
   if (!is.null(title)) title = paste0(title,': ')
   # type
-  type = list(...)[["type"]]
+  type = kwargs[["type"]]
   if (isTRUE(show_plot) & !is.null(show_plot) & !is.null(type)) show_plot = type
   # show_plot
   show_plot = intersect(show_plot, c('ks', 'lift', 'gain', 'roc', 'lz', 'pr', 'f1', 'density'))
   # pic
   if (length(show_plot)>0) {
     # datasets for visualization
-    groupnum = list(...)[["groupnum"]]
+    groupnum = kwargs[["groupnum"]]
     if (is.null(groupnum)) groupnum = 1000
     dt_ev_lst_plot = lapply(dt_lst, function(x) func_dat_eva(x, groupnum = groupnum))
     # plot
@@ -904,7 +905,7 @@ psi_plot = function(dt_psi, psi_sn, title, sn, line_color = 'blue', bar_color = 
 
 
 gains_table_format = function(dt_distr) {
-  . = good = bad = bin = count = datset = NULL
+  . = good = bad = bin = count = datset = bin_avg = NULL
 
   dt_distr = dt_distr[, .(
     bin,
@@ -914,7 +915,8 @@ gains_table_format = function(dt_distr) {
     count_distr = count/sum(count),
     badprob=bad/count,
     approval_rate = cumsum(count)/sum(count),
-    cum_badprob = cumsum(bad)/cumsum(count)
+    cum_badprob = cumsum(bad)/cumsum(count),
+    bin_avg
   ), by = datset]
 
   return(dt_distr)
@@ -927,6 +929,7 @@ gains_table_format = function(dt_distr) {
 #' @param label A list of label value for actual and expected data samples. For example, label = list(actual = labelA, expect = labelE).
 #' @param bin_num Integer, the number of score bins. Defaults to 10. If it is 'max', then individual scores are used as bins.
 #' @param method The score is binning by equal frequency or equal width. Accepted values are 'freq' and 'width'. Defaults to 'freq'.
+#' @param width_by Number, increment of the score breaks when method is set as 'width'. If it is provided the above parameter bin_num will not be used. Defaults to NULL.
 #' @param positive Value of positive class, Defaults to "bad|1".
 #' @param ... Additional parameters.
 #'
@@ -1006,31 +1009,34 @@ gains_table_format = function(dt_distr) {
 #' }
 #'
 #' @export
-gains_table = function(score, label, bin_num=10, method='freq', positive='bad|1', ...) {
+gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, positive='bad|1', ...) {
   . = V1 = V2 = bad = bin = count = datset = group = NULL
 
   # arguments
+  kwargs = list(...)
   # seed
-  seed = list(...)[['seed']]
+  seed = kwargs[['seed']]
   if (is.null(seed)) seed = 618
   # title
-  title = list(...)[['title']]
+  title = kwargs[['title']]
   if (is.null(title)) title = NULL
   # return_dt_psi
-  return_dt_psi = list(...)[['return_dt_psi']]
+  return_dt_psi = kwargs[['return_dt_psi']]
   if (is.null(return_dt_psi)) return_dt_psi = FALSE
 
   # bin_num
   if (bin_num != 'max' & bin_num <= 1) bin_num = 10
   # method
-  bin_type = list(...)[['seed']]
+  bin_type = kwargs[['seed']]
   if (!is.null(bin_type)) method = bin_type
   if (!(method %in% c('freq', 'width'))) method = 'freq'
+  # width_by
+  if (!is.numeric(width_by) || width_by <= 0) width_by = NULL
 
 
 
   # data frame of score and label
-  dt_sl = list(...)[['dt_sl']]
+  dt_sl = kwargs[['dt_sl']]
   if (is.null(dt_sl) & !is.null(score) & !is.null(label)) {
 
     # dateset list of score and label
@@ -1061,10 +1067,19 @@ gains_table = function(score, label, bin_num=10, method='freq', positive='bad|1'
                          ][, c(-Inf, score[-1], Inf)]
 
     } else if (method == 'width') {
-      # in equal width
-      minmax = dt_sl[, sapply(.SD, function(x) list(min(x), max(x))), by=datset, .SDcols=c('score')
-                   ][,.(mins = max(V1), maxs = min(V2))] # choose min of max value, and max of min value by dataset
-      brkp = seq(minmax$mins, minmax$maxs, length.out = bin_num+1)
+
+      if (is.null(width_by) || width_by > max(score)-min(score)) {
+        # in equal width
+        minmax = dt_sl[, sapply(.SD, function(x) list(min(x), max(x))), by=datset, .SDcols=c('score')
+                       ][,.(mins = max(V1), maxs = min(V2))] # choose min of max value, and max of min value by dataset
+
+        brkp = seq(minmax$mins, minmax$maxs, length.out = bin_num+1)
+      } else {
+        minmax = quantile(score, c(0.02, 0.98))
+        minmax = round(minmax/width_by) * width_by
+        brkp = seq(minmax[[1]]-width_by, minmax[[2]]+width_by, by = width_by)
+      }
+
       if (is_score) brkp = round(brkp)
       brkp = c(-Inf, brkp[-c(1, length(brkp))], Inf)
     }
@@ -1073,7 +1088,7 @@ gains_table = function(score, label, bin_num=10, method='freq', positive='bad|1'
   if (return_dt_psi) return(dt_psi) # innter result usded in perf_psi function
 
   # distribution table
-  dt_distr = dt_psi[, .(count=.N, good = sum(label==0), bad = sum(label==1)), keyby = .(datset,bin)
+  dt_distr = dt_psi[, .(count=.N, good = sum(label==0), bad = sum(label==1), bin_avg = mean(score)), keyby = .(datset,bin)
                   ][order(datset, -bin)]
   if (!is_score) dt_distr = dt_distr[order(datset, bin)] #is predicted probability
   # gains table
@@ -1186,22 +1201,23 @@ perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad
   . = datset = group = V1 = bin = NULL
 
   # arguments
-  bin_type = list(...)[['bin_type']]
-  method   = list(...)[['method']]
+  kwargs = list(...)
+  bin_type = kwargs[['bin_type']]
+  method   = kwargs[['method']]
   if (!is.null(bin_type)) method = bin_type
   if (is.null(method) || !(method %in% c('freq', 'width'))) method='width'
 
-  seed = list(...)[['seed']]
+  seed = kwargs[['seed']]
   if (is.null(seed)) seed = 618
 
-  return_distr_dat = list(...)[['return_distr_dat']]
+  return_distr_dat = kwargs[['return_distr_dat']]
   if (is.null(return_distr_dat)) return_distr_dat = FALSE
 
   if (show_plot) {
-    line_color = list(...)[['line_color']]
+    line_color = kwargs[['line_color']]
     if (is.null(line_color)) line_color = 'blue'
 
-    bar_color = list(...)[['bar_color']]
+    bar_color = kwargs[['bar_color']]
   }
 
 
@@ -1305,14 +1321,15 @@ perf_cv = function(dt, y, x=NULL, no_folds = 5, seeds = NULL, binomial_metric = 
   # dt
   dt = dt[, c(y,x), with=FALSE]
 
+  kwargs = list(...)
   # seed
-  seed = list(...)[['seed']]
+  seed = kwargs[['seed']]
   if (is.null(seed)) seed = 618
   # ratio
-  ratio = list(...)[['ratio']]
+  ratio = kwargs[['ratio']]
   if (is.null(ratio)) ratio = c(1-1/no_folds, 1/no_folds)
   # model
-  model = list(...)[['model']]
+  model = kwargs[['model']]
 
   # split dt into no_folds
   if (is.null(seeds)) {

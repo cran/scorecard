@@ -5,8 +5,7 @@
 \title{Cross Validation}
 \usage{
 perf_cv(dt, y, x = NULL, no_folds = 5, seeds = NULL,
-  binomial_metric = "ks", positive = "bad|1", breaks_list = NULL,
-  ...)
+  binomial_metric = "ks", positive = "bad|1", breaks_list = NULL, ...)
 }
 \arguments{
 \item{dt}{A data frame with both x (predictor/feature) and y (response/label) variables.}

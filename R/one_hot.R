@@ -6,7 +6,7 @@
 #' @param var_skip Name of categorical variables that will skip for one-hot encoding. Defaults to NULL.
 #' @param var_encode Name of categorical variables to be one-hot encoded, Defaults to NULL. If it is NULL, then all categorical variables except in var_skip are counted.
 #' @param nacol_rm Logical. One-hot encoding on categorical variable contains missing values, whether to remove the column generated to indicate the presence of NAs. Defaults to FALSE.
-#' @param replace_na Replace missing values with a specified value such as -1, or the mean/median value for numeric variable and mode value for categorical variable. Defaults to NULL, which means no missing values will be replaced.
+#' @param ... Additional parameters.
 #'
 #' @return A data frame
 #'
@@ -28,22 +28,9 @@
 #' dat_onehot2 = one_hot(dat, var_skip = 'creditability', nacol_rm = TRUE)
 #' str(dat_onehot2)
 #'
-#' ## one hot and replace NAs
-#' dat_onehot3 = one_hot(dat, var_skip = 'creditability', replace_na = -1)
-#' str(dat_onehot3)
-#'
-#'
-#' # replace missing values only
-#' ## replace with -1
-#' dat_repna1 = one_hot(dat, var_skip = names(dat), replace_na = -1)
-#' ## replace with median for numeric, and mode for categorical
-#' dat_repna2 = one_hot(dat, var_skip = names(dat), replace_na = 'median')
-#' ## replace with to mean for numeric, and mode for categorical
-#' dat_repna3 = one_hot(dat, var_skip = names(dat), replace_na = 'mean')
-#'
 #'
 #' @export
-one_hot = function(dt, var_skip = NULL, var_encode = NULL, nacol_rm = FALSE, replace_na = NULL) {
+one_hot = function(dt, var_skip = NULL, var_encode = NULL, nacol_rm = FALSE, ...) {
   value = variable = NULL
 
   dt = setDT(copy(dt)) # copy(setDT(dt))
@@ -86,49 +73,167 @@ one_hot = function(dt, var_skip = NULL, var_encode = NULL, nacol_rm = FALSE, rep
     dt_new = cbind(dt, dcast_dt)[, (c(var_encode, 'rowid')) := NULL]
   }
 
+
+
   # replace missing values with fillna
-  if (!is.null(replace_na)) {
-    names_fillna = names(dt_new)
-    # if (!is.null(var_skip)) names_fillna = setdiff(names_fillna, var_skip)
-    dt_new = dt_new[, (names_fillna) := lapply(.SD, function(x) {
-      if (anyNA(x)) {
-        # class of x is numeric
-        xisnum = all(class(x) %in% c('numeric', 'integer'))
-
-        # fillna values
-        if (is.numeric(replace_na)) {
-          fillna = replace_na
-        } else if ( replace_na %in% c('mean', 'median')) {
-          if (xisnum) {
-            fillna = do.call(replace_na, list(x, na.rm=TRUE))
-          } else {
-            fillna = names(which.max(table(x)))
-          }
-        } else {
-          fillna = -1
-        }
-        # set fill as character if x is not numeric
-        if (!xisnum) {
-          fillna = as.character(fillna)
-        }
-
-        # replace missing values in x
-        if (is.factor(x)) {
-          # https://stackoverflow.com/questions/39126537/replace-na-in-a-factor-column
-          x = `levels<-`(addNA(x), c(levels(x), fillna))
-        } else {
-          x[is.na(x)] <- fillna
-        }
-      }
-      return(x)
-    }), .SDcols = names_fillna]
-  }
+  if (!is.null(list(...)[['replace_na']])) dat_new = replace_na(dat_new, list(...)[['replace_na']])
 
   return(dt_new[])
 }
 
 
-# missing value imputation
-# feature scaling (standardization, normalization)
+
+#' @export
+replace_na.default = function(dt, repl) {
+  # fillna
+  fillna = repl
+  #
+  if (repl %in% c('mean', 'median')) {
+    if (inherits(dt, c('integer', 'numeric', 'logical'))) {
+      fillna = do.call(repl, list(dt, na.rm=TRUE))
+    } else {
+      fillna = names(which.max(table(dt)))
+    }
+  }
+  # set fill as character if dt is not numeric
+  if (inherits(dt, c('character', 'factor'))) {
+    fillna = as.character(fillna)
+  } else {
+    fillna = as.numeric(fillna)
+  }
+
+
+  # replace missing values
+  if (is.factor(dt)) {
+    # https://stackoverflow.com/questions/39126537/replace-na-in-a-factor-column
+    dt = `levels<-`(addNA(dt), c(levels(dt), fillna))
+  } else {
+    dt[is.na(dt)] <- fillna
+  }
+
+  return(dt)
+}
+
+#' @export
+replace_na.data.frame = function(dt, repl) {
+  dt = setDT(copy(dt))
+
+  cols_na = names(dt)[sapply(dt, anyNA)]
+  if (length(cols_na) > 0) {
+    dt = dt[, (cols_na) := lapply(.SD, function(x) {
+      replace_na.default(x, repl)
+    }), .SDcols = cols_na]
+  }
+
+  return(dt)
+}
+#' Replace Missing Values
+#'
+#' Replace missing values with a specified value or mean/median value.
+#'
+#' @param dt A data frame or vector.
+#' @param repl Replace missing values with a specified value such as -1, or the mean/median value for numeric variable and mode value for categorical variable if repl is mean or median.
+#'
+#' @examples
+#' # load germancredit data
+#' data(germancredit)
+#'
+#' library(data.table)
+#' dat = rbind(
+#'   setDT(germancredit)[, c(sample(20,3),21)],
+#'   data.table(creditability=sample(c("good","bad"),10,replace=TRUE)),
+#'   fill=TRUE)
+#'
+#' ## replace with -1
+#' dat_repna1 = replace_na(dat, repl = -1)
+#' ## replace with median for numeric, and mode for categorical
+#' dat_repna2 = replace_na(dat, repl = 'median')
+#' ## replace with mean for numeric, and mode for categorical
+#' dat_repna3 = replace_na(dat, repl = 'mean')
+#'
+#' @export
+replace_na = function(dt, repl) {
+  UseMethod('replace_na')
+}
+
+
+#' @export
+var_scale.default = function(dt, var_skip=NULL, type='standard', ...) {
+  kwargs = list(...)
+
+  if (type == 'standard') {
+    center = TRUE
+    if ('center' %in% names(kwargs)) center = kwargs[['center']]
+    scale = TRUE
+    if ('scale' %in% names(kwargs)) scale = kwargs[['scale']]
+
+    dt_scale = as.vector(do.call('scale', list(x=dt, center=center, scale=scale)))
+  } else if (type == 'minmax') {
+    dt_scale = (dt - min(dt, na.rm=TRUE)) / diff(range(dt, na.rm=TRUE))
+    new_rng = kwargs[['new_range']]
+    if (!is.null(new_rng)) dt_scale = dt_scale*diff(new_rng) + min(new_rng)
+  } else dt_scale = dt
+  return(dt_scale)
+}
+#' @export
+var_scale.data.frame = function(dt, var_skip=NULL, type='standard', ...) {
+  dt = setDT(copy(dt))
+  cols_num = names(dt)[sapply(dt, is.numeric)]
+  cols_num = setdiff(cols_num, var_skip)
+
+  if (length(cols_num) > 0) {
+    dt = dt[, (cols_num) := lapply(.SD, function(x) {
+      do.call( 'var_scale.default', c(list(dt=x, type=type), list(...)) )
+    }), .SDcols = cols_num]
+  }
+  return(dt)
+}
+
+#' Variable Scaling
+#'
+#' scaling variables using standardization or normalization
+#'
+#' @param dt a data frame or vector
+#' @param var_skip Name of variables that will skip for scaling Defaults to NULL.
+#' @param type type of scaling method, including standard or minmax.
+#' @param ... Additional parameters.
+#'
+#' @examples
+#' data("germancredit")
+#'
+#' # standardization
+#' dts1 = var_scale(germancredit, type = 'standard')
+#'
+#' # normalization/minmax
+#' dts2 = var_scale(germancredit, type = 'minmax')
+#' dts2 = var_scale(germancredit, type = 'minmax', new_range = c(-1, 1))
+#'
+#' @export
+var_scale = function(dt, var_skip=NULL, type='standard', ...) {
+  type = match.arg(type, c('standard', 'minmax'))
+  UseMethod('var_scale')
+}
+
+
+# clusterSim::data.Normalization
+# n1 - standardization ((x-mean)/sd)
+# n2 - positional standardization ((x-median)/mad)
+# n3 - unitization ((x-mean)/range)
+# n3a - positional unitization ((x-median)/range)
+# n4 - unitization with zero minimum ((x-min)/range)
+# n5 - normalization in range <-1,1> ((x-mean)/max(abs(x-mean)))
+# n5a - positional normalization in range <-1,1> ((x-median)/max(abs(x-median)))
+# n6 - quotient transformation (x/sd)
+# n6a - positional quotient transformation (x/mad)
+# n7 - quotient transformation (x/range)
+# n8 - quotient transformation (x/max)
+# n9 - quotient transformation (x/mean)
+# n9a - positional quotient transformation (x/median)
+# n10 - quotient transformation (x/sum)
+# n11 - quotient transformation (x/sqrt(SSQ))
+# n12 - normalization ((x-mean)/sqrt(sum((x-mean)^2)))
+# n12a - positional normalization ((x-median)/sqrt(sum((x-median)^2)))
+# n13 - normalization with zero being the central point ((x-midrange)/(range/2))
+
 # box-cox transformation
 #

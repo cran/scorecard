@@ -6,8 +6,7 @@
 \usage{
 perf_eva(pred, label, title = NULL, binomial_metric = c("mse", "rmse",
   "logloss", "r2", "ks", "auc", "gini"), confusion_matrix = TRUE,
-  threshold = NULL, show_plot = c("ks", "roc"), positive = "bad|1",
-  ...)
+  threshold = NULL, show_plot = c("ks", "roc"), positive = "bad|1", ...)
 }
 \arguments{
 \item{pred}{A list or vector of predicted probability or score.}

@@ -1,3 +1,12 @@
+# scorecard 0.2.8
+
+* fixed a bug in woebin using chimerge method
+* gains_table supports setting of break width
+* fixed a bug in germancredit data set
+* scorecard2 supports to adjust oversampling 
+* provides replace_na function to replace missing values
+* a new function var_scale is provided for variable scaling 
+
 # scorecard 0.2.7
 
 * check var_kp in scorecard_ply function
