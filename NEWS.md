@@ -1,3 +1,9 @@
+# scorecard 0.2.8.1
+
+* fixed a bug in woebin function cant handle special_values
+* woebin_adj supports to return bins list.
+* fixed a bug in report function
+
 # scorecard 0.2.8
 
 * fixed a bug in woebin using chimerge method

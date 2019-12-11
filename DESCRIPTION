@@ -1,5 +1,5 @@
 Package: scorecard
-Version: 0.2.8
+Version: 0.2.8.1
 Title: Credit Risk Scorecard
 Description: 
   The `scorecard` package makes the development of credit risk scorecard 
@@ -22,11 +22,11 @@ URL: https://github.com/ShichenXie/scorecard
 BugReports: https://github.com/ShichenXie/scorecard/issues
 LazyData: true
 VignetteBuilder: knitr
-RoxygenNote: 7.0.1
+RoxygenNote: 7.0.2
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2019-12-04 15:10:35 UTC; shichenxie
+Packaged: 2019-12-11 05:30:04 UTC; shichenxie
 Author: Shichen Xie [aut, cre]
 Maintainer: Shichen Xie <xie@shichen.name>
 Repository: CRAN
-Date/Publication: 2019-12-04 15:30:02 UTC
+Date/Publication: 2019-12-11 08:40:02 UTC
