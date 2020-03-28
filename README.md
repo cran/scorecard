@@ -1,8 +1,9 @@
 # scorecard
 
+[![Travis build status](https://travis-ci.org/ShichenXie/scorecard.svg?branch=master)](https://travis-ci.org/ShichenXie/scorecard)
 [![CRAN\_Status\_Badge](https://www.r-pkg.org/badges/version/scorecard)](https://cran.r-project.org/package=scorecard)
 [![](http://cranlogs.r-pkg.org/badges/grand-total/scorecard)](https://cran.r-project.org/package=scorecard)
-[![Travis build status](https://travis-ci.org/ShichenXie/scorecard.svg?branch=master)](https://travis-ci.org/ShichenXie/scorecard)
+[![](http://cranlogs.r-pkg.org/badges/scorecard)](https://cran.r-project.org/package=scorecard)
 
 
 The goal of `scorecard` package is to make the development of the traditional credit risk scorecard model easier and efficient by providing functions for some common tasks that summarized in below. This package can also used in the development of machine learning models on binomial classification. 
@@ -42,7 +43,7 @@ data("germancredit")
 # filter variable via missing rate, iv, identical value rate
 dt_f = var_filter(germancredit, y="creditability")
 # breaking dt into train and test
-dt_list = split_df(dt_f, y="creditability", ratio = 0.6, seed = 30)
+dt_list = split_df(dt_f, y="creditability", ratio = c(0.6, 0.4), seed = 30)
 label_list = lapply(dt_list, function(x) x$creditability)
 
 # woe binning ------

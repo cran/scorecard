@@ -228,13 +228,9 @@ woebin2_init_bin = function(dtm, init_count_distr, breaks, spl_val) {
     xvalue = dtm[, value]
 
     # breaks vector & outlier
-    iq = quantile(xvalue, na.rm = TRUE)
+    iq = quantile(xvalue, probs = c(init_count_distr, 1-init_count_distr), na.rm = TRUE)
     iqr = IQR(xvalue, na.rm = TRUE)
-    if (iqr == 0) {
-      xvalue_rm_outlier = xvalue
-    } else {
-      xvalue_rm_outlier = xvalue[which(xvalue >= iq[2]-3*iqr & xvalue <= iq[4]+3*iqr)]
-    }
+    xvalue_rm_outlier = xvalue[which(xvalue >= iq[1]-3*iqr & xvalue <= iq[2]+3*iqr)]
 
     # number of initial binning
     n = trunc(1/init_count_distr)
@@ -482,7 +478,7 @@ woebin2_chimerge = function(
     a_sum = sum(a+a_lag)), by='bin'
   ][, `:=`(
     e = (a_rowsum*a_colsum)/a_sum,
-    e_lag = a_lag_rowsum*a_colsum/a_sum
+    e_lag = prod(a_lag_rowsum, a_colsum, na.rm = TRUE) / a_sum
   )][, .(chisq=sum((a-e)^2/e + (a_lag-e_lag)^2/e_lag)), by='bin']
 
   return(merge(initial_binning[,count:=good+bad], chisq_df, all.x = TRUE, sort = FALSE))
@@ -505,15 +501,15 @@ woebin2_chimerge = function(
     bin_count_distr_min < count_distr_limit ||
     bin_nrow > bin_num_limit) {
     # brkp needs to be removed
-    if (bin_chisq_min < chisq_limit) {
-      rm_brkp = binning_chisq[, merge_tolead := FALSE][order(chisq, count)][1,]
-
-    } else if (bin_count_distr_min < count_distr_limit) {
+    if (bin_count_distr_min < count_distr_limit) {
       rm_brkp = binning_chisq[,`:=`(
         count_distr = count/sum(count),
         chisq_lead = shift(chisq, type = "lead", fill = Inf)
       )][,merge_tolead := ifelse(is.na(chisq), TRUE, chisq > chisq_lead)
-       ][!is.na(brkp)][order(count_distr)][1,]
+         ][!is.na(brkp)][order(count_distr)][1,]
+
+    } else if (bin_chisq_min < chisq_limit) {
+      rm_brkp = binning_chisq[, merge_tolead := FALSE][order(chisq, count)][1,]
 
     } else if (bin_nrow > bin_num_limit) {
       rm_brkp = binning_chisq[, merge_tolead := FALSE][order(chisq, count)][1,]
@@ -831,8 +827,8 @@ woebin = function(
   # arguments ------
   kwargs = list(...)
   # method
-  method = match.arg(method, c("tree", "chimerge", 'freq', 'width'))
-  if (!(method %in% c("tree", "chimerge", 'freq', 'width'))) {
+  method = try(match.arg(method, c("tree", "chimerge", 'freq', 'width')), silent = TRUE)
+  if (inherits(method, 'try-error')) {
     warning("Incorrect inputs; method should be tree or chimerge. Parameter was set to default (tree).")
     method = "tree"
   }
@@ -1029,7 +1025,7 @@ woepoints_ply1 = function(dtx, binx, x_i, woe_points) {
   # rename binx
   setnames(binx, c("bin", x_i, paste(x_i, woe_points, sep="_")))
   # merge
-  dtx_suffix = merge(setDF(dtx), setDF(binx), by=x_i, all.x = TRUE)
+  dtx_suffix = merge(dtx, binx, by=x_i, all.x = TRUE)
   dtx_suffix = setDT(dtx_suffix)[order(rowid)][, (c("rowid", "bin", x_i)) := NULL]
 
   return(dtx_suffix)

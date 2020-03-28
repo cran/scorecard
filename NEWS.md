@@ -1,3 +1,12 @@
+# scorecard 0.2.9
+
+* fixed a bug in perf_psi when label is null
+* modified a parameter in split_df function
+* adding test files
+* added a warning message in scorecard2 function when there are na coefficients in lr model
+* improve the performance of rep_blank_na function
+* modified the method to create initial fine binning breaks.
+
 # scorecard 0.2.8.1
 
 * fixed a bug in woebin function cant handle special_values

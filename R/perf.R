@@ -230,8 +230,8 @@ plot_ks = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     geom_segment(data = dfks, aes(x = cumpop, y = 0, xend = cumpop, yend = ks, color=datset), linetype = "dashed") +
     geom_point(data = dfks, aes(x=cumpop, y=ks), color='red') +
     # geom_text(data = dfks, aes(x=cumpop, y=ks, label=oc, color=datset), vjust=0) +
-    annotate("text", x=0.4, y=0.7, vjust = -0.2, label="Good", colour = "gray") +
-    annotate("text", x=0.95, y=0.7, vjust = -0.2, label="Bad", colour = "gray") +
+    annotate("text", x=0.4, y=0.7, vjust = -0.2, label="Positive", colour = "gray") +
+    annotate("text", x=0.95, y=0.7, vjust = -0.2, label="Negative", colour = "gray") +
     theme_bw() +
     theme(legend.position=c(0,1),
           legend.justification=c(0,1),
@@ -242,7 +242,7 @@ plot_ks = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
 
   # axis, labs, theme
   pks = pks + ggtitle(paste0(title, 'K-S')) +
-    labs(x = "% of population", y = "% of total Good/Bad") +
+    labs(x = "% of population", y = "% of total Neg/Posi") +
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     coord_fixed(xlim = c(0,1), ylim = c(0,1), expand = FALSE)
@@ -421,7 +421,7 @@ plot_lz = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
 
   # axis, labs, theme
   plz = plz + ggtitle(paste0(title, 'Lorenz')) +
-    labs(x = "% of population", y = "% of total Good/Bad") +
+    labs(x = "% of population", y = "% of total Neg/Posi") +
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     coord_fixed(xlim = c(0,1), ylim = c(0,1), expand = FALSE)
@@ -513,8 +513,9 @@ func_dat_labelpred = function(pred, label, title, positive, seed, ...) {
   for (ds in names(lst_pl2$pred)) { # ds = dataset
     lst_pred_ds = lst_pl2$pred[[ds]]
 
-    lst_label_ds = lst_pl2$label[[ds]]
-    if (is.null(lst_label_ds)) lst_label_ds[[ds]] = rep_len(NA, unique(sapply(lst_pred_ds, length)))
+    lst_label_ds = NULL
+    if (!is.null(label)) lst_label_ds = lst_pl2$label[[ds]]
+    if (is.null(lst_label_ds)) lst_label_ds[['label']] = rep_len(NA, unique(sapply(lst_pred_ds, length)))
 
     dt_lst[[ds]] = setDT(c(lst_pred_ds, lst_label_ds))
   }
@@ -540,7 +541,10 @@ func_dat_labelpred = function(pred, label, title, positive, seed, ...) {
 
   # check label & remove rows with missing values in pred
   dt_lst = lapply(dt_lst, function(x) {
-    if (!is.null(label)) x = check_y(x, 'label', positive)
+    if (!is.null(label)) {
+      if (length(unique(x$label)) > 5) stop('Please double check the arguments. The position of "label" have exchanged with "pred" to the second argument since version 0.2.0, in order to consistent with perf_psi.')
+      x = check_y(x, 'label', positive)
+    }
     if (anyNA(x)) {
       warning("The NAs in dataset have been removed.")
       x = x[complete.cases(copy(x)[,label:=NULL]), ]#x[!is.na(pred)]
@@ -705,19 +709,23 @@ pf_cutoffs = function(dt_ev_lst) {
 #' # credit score, only_total_score = TRUE
 #' score_list = lapply(dt_list, function(x) scorecard_ply(x, card))
 #' # credit score, only_total_score = FALSE
-#' score_list2 = lapply(dt_list, function(x) scorecard_ply(x, card, only_total_score=FALSE))
+#' score_list2 = lapply(dt_list, function(x) scorecard_ply(x, card,
+#'   only_total_score=FALSE))
 #'
 #'
 #' ###### perf_eva examples ######
 #' # Example I, one datset
 #' ## predicted p1
-#' perf_eva(pred = pred_list$train, label=dt_list$train$creditability, title = 'train')
+#' perf_eva(pred = pred_list$train, label=dt_list$train$creditability,
+#'   title = 'train')
 #' ## predicted score
-#' # perf_eva(pred = score_list$train, label=dt_list$train$creditability, title = 'train')
+#' # perf_eva(pred = score_list$train, label=dt_list$train$creditability,
+#' #   title = 'train')
 #'
 #' # Example II, multiple datsets
 #' ## predicted p1
-#' perf_eva(pred = pred_list, label = label_list)
+#' perf_eva(pred = pred_list, label = label_list,
+#'  show_plot = c('ks', 'lift', 'gain', 'roc', 'lz', 'pr', 'f1', 'density'))
 #' ## predicted score
 #' # perf_eva(score_list, label_list)
 #'
@@ -1338,7 +1346,8 @@ perf_cv = function(dt, y, x=NULL, no_folds = 5, seeds = NULL, binomial_metric = 
   if (is.null(seeds)) {
     dts = do.call('split_df', list(
       dt = dt, y = y,
-      ratio = rep(1/no_folds, no_folds), no_dfs = no_folds,
+      ratio = rep(1/no_folds, no_folds),
+      name_dfs = as.character(seq_len(no_folds)),
       seed = seed
     ))
 
