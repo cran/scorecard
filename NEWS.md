@@ -1,3 +1,9 @@
+# scorecard 0.3.0
+
+* modified the method to create initial fine binning breaks.
+* fixed the bintxt to vector function
+* report function supports no_cores argument 
+
 # scorecard 0.2.9
 
 * fixed a bug in perf_psi when label is null

@@ -228,9 +228,17 @@ woebin2_init_bin = function(dtm, init_count_distr, breaks, spl_val) {
     xvalue = dtm[, value]
 
     # breaks vector & outlier
-    iq = quantile(xvalue, probs = c(init_count_distr, 1-init_count_distr), na.rm = TRUE)
     iqr = IQR(xvalue, na.rm = TRUE)
-    xvalue_rm_outlier = xvalue[which(xvalue >= iq[1]-3*iqr & xvalue <= iq[2]+3*iqr)]
+    if (iqr == 0) {
+      prob_down = 0.01
+      prob_up = 0.99
+    } else {
+      prob_down = 0.25
+      prob_up = 0.75
+    }
+    xrng = quantile(xvalue, probs = c(prob_down, prob_up), na.rm = TRUE)
+    xvalue_rm_outlier = xvalue[which(xvalue >= xrng[1]-3*iqr & xvalue <= xrng[2]+3*iqr)]
+
 
     # number of initial binning
     n = trunc(1/init_count_distr)
@@ -241,7 +249,7 @@ woebin2_init_bin = function(dtm, init_count_distr, breaks, spl_val) {
     if (len_uniq_x < 10) {
       brk = setdiff(unique(xvalue_rm_outlier), c(NA, Inf, -Inf))
     } else {
-      brk = pretty(xvalue_rm_outlier, n)
+      brk = suppressWarnings(pretty(xvalue_rm_outlier, n))
     }
     brk = sort(brk[(brk <= max(xvalue, na.rm =TRUE)) & (brk > min(xvalue, na.rm =TRUE))])
     brk = unique(c(-Inf, brk, Inf))
@@ -904,7 +912,7 @@ woebin = function(
   # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
   # https://privefl.github.io/blog/a-guide-to-parallelism-in-r/
 
-  if (!is.numeric(no_cores) || no_cores<1) {
+  if (is.null(no_cores) || !is.numeric(no_cores) || no_cores<1) {
     all_cores = detectCores(logical=F)-1
     no_cores = ceiling(ifelse(xs_len/5 < all_cores, xs_len/5, all_cores*0.9))
   }
@@ -1128,7 +1136,7 @@ woebin_ply = function(dt, bins, to='woe', no_cores=NULL, print_step=0L, replace_
   # the databc_colomun_placeholder will be remove in the result, in case dt_init is an empty dataframe
 
   # loop on xs # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
-  if (!is.numeric(no_cores) || no_cores <1) {
+  if (is.null(no_cores) || !is.numeric(no_cores) || no_cores <1) {
     all_cores = detectCores(logical=F)-1
     no_cores = ceiling(ifelse(xs_len/5 < all_cores, xs_len/5, all_cores*0.9))
   }
