@@ -44,6 +44,14 @@ print(p1_w)
 p1_c = woebin_plot(bins1, line_color='#FC8D59', bar_color=c('#FFFFBF', '#99D594'))
 print(p1_c)
 
+# show iv, line value, bar value
+p1_iv = woebin_plot(bins1, show_iv = FALSE)
+print(p1_iv)
+p1_lineval = woebin_plot(bins1, show_lineval = FALSE)
+print(p1_lineval)
+p1_barval  = woebin_plot(bins1, show_barval = FALSE)
+print(p1_barval)
+
 \donttest{
 # Example II
 bins = woebin(germancredit, y="creditability")

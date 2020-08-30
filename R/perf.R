@@ -80,29 +80,39 @@ lift = function(dt_ev, threshold = 0.5, ...) {
 
 # optimal cutoff ------
 # ks
-cutoff_ks = function(dt_ev) {
+cutoff_ks = function(dt_ev, pred_desc=FALSE) {
+  setDT(dt_ev)
   TN = totN = FN = totP = . = cumpop =  pred = NULL
 
-  dt_ev[, ks := abs(TN/totN - FN/totP)
+  rt = dt_ev[, ks := abs(TN/totN - FN/totP)
         ][ks == max(ks, na.rm = TRUE)
           ][,.(cumpop, pred, ks)]
+
+  if (pred_desc) rt[.N] else rt[1]
 }
 # roc
-cutoff_roc = function(dt_ev) {
+cutoff_roc = function(dt_ev, pred_desc=FALSE) {
+  setDT(dt_ev)
   . = cumpop = pred = TPR = FPR = co = NULL
-  dt_ev[, .(cumpop,pred,TPR,FPR)
+
+  rt = dt_ev[, .(cumpop,pred,TPR,FPR)
         ][, co := (TPR-FPR)^2/2
           ][co == max(co, na.rm = TRUE)
-            ][, .(cumpop, pred, TPR, FPR)][1]
+            ][, .(cumpop, pred, TPR, FPR)]
+
+  if (pred_desc) rt[.N] else rt[1]
 }
 # fbeta
-cutoff_fbeta = function(dt_ev, beta=1, ...) {
+cutoff_fbeta = function(dt_ev, beta=1, pred_desc=FALSE,  ...) {
+  setDT(dt_ev)
   . = cumpop = pred = precision =  recall = f = NULL
 
-  fb = dt_ev[, .(cumpop, pred,precision,recall)
+  rt = dt_ev[, .(cumpop, pred,precision,recall)
              ][, f := 1/(1/(1+beta^2)*(1/precision+beta^2/recall))
-               ][which.max(f)][1]
-  setnames(fb, c('cumpop', 'pred', 'precision', 'recall', paste0('f',beta)))
+               ][which.max(f)]
+
+  if (pred_desc) rt[.N] else rt[1]
+  setnames(rt, c('cumpop', 'pred', 'precision', 'recall', paste0('f',beta)))
 }
 
 ## confusion matrix
@@ -156,9 +166,9 @@ plot_density = function(dt_lst, title=NULL, positive, ...) {
   # max pred
   if (dt_df[,mean(pred) < -1]) dt_df[, pred := abs(pred)]
   max_pred = dt_df[,max(pred)]
-  if (max_pred < 1) max_pred = 1
+  # if (max_pred < 1) max_pred = 1
   min_pred = dt_df[,min(pred)]
-  if (max_pred == 1) min_pred = 0
+  # if (max_pred == 1) min_pred = 0
 
   # data frame of max density by datset and label
   max_density_by_datset_label = dt_df[
@@ -173,13 +183,13 @@ plot_density = function(dt_lst, title=NULL, positive, ...) {
   # coord for label_string
   coord_label = max_density_by_datset_label[
     , .(pred=mean(pred), dens=mean(dens)), by=label
-  ][, label_str := ifelse(grepl(positive, label), 'positive', 'negative')]
+  ][, label_str := ifelse(grepl(positive, label), 'Posi', 'Neg')]
 
   # plot
   pdens = ggplot(data = dt_df) +
     # geom_histogram(aes(x=pred)) +
     # geom_density(aes(x=pred), linetype='dotted') +
-    geom_density(aes(x=pred, color=datset, linetype=label), fill='gray', alpha=0.1, adjust = 1.618) +
+    geom_density(aes(x=pred, color=datset, linetype=label), fill='gray', alpha=0.1) +
     geom_text(data = coord_label, aes(x=pred, y=dens, label=label_str)) +
     # geom_vline(xintercept = threshold, linetype='dotted') +
     # geom_text(aes(label='cut-off', x=threshold, y = 0), vjust=0) +
@@ -202,12 +212,14 @@ plot_density = function(dt_lst, title=NULL, positive, ...) {
 }
 
 plot_ks = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
-  . = datset = KS = metrics = pred_threshold = coord = maxks = oc = pred = cumpop = cumgood = cumbad = NULL
+  . = datset = KS = metrics = pred_threshold = coord = maxks = oc = pred = cumpop = cumgood = cumbad = nN = nP = NULL
 
   # data for ks plot
   dt_ks = lapply(dat_eva_lst, function(x) {
     TN = totN = FN = totP = NULL
-    x = x[, .(cumpop, pred, cumgood = TN/totN, cumbad = FN/totP, ks = abs(TN/totN - FN/totP))]
+    x = x[, .(
+      cumpop, pred, cumgood = cumsum(nN)/totN, cumbad = cumsum(nP)/totP
+    )][, ks := abs(cumgood - cumbad)]
     x = rbind(x, data.table(cumpop=0), fill=TRUE)
     x[is.na(x)] <- 0
     return(x[order(cumpop)])
@@ -222,6 +234,12 @@ plot_ks = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
   # max ks row
   dfks = dt_ks[, .SD[ks == max(ks)][1], by = 'datset'][, oc := sprintf('@%.4f', round(pred,4))][]#[, oc := sprintf('%.4f\n(%.4f,%.4f)', round(pred,4), round(cumpop,4), round(ks,4))]
 
+  x_posi = 0.4
+  x_neg = 0.95
+  if (dt_ks[, mean(cumbad) < mean(cumgood)]) {
+    x_neg = 0.4
+    x_posi = 0.95
+  }
   # plot
   pks = ggplot(data = dt_ks, aes(x=cumpop)) +
     geom_line(aes(y=cumgood, color=datset), linetype='dotted') +
@@ -230,8 +248,8 @@ plot_ks = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     geom_segment(data = dfks, aes(x = cumpop, y = 0, xend = cumpop, yend = ks, color=datset), linetype = "dashed") +
     geom_point(data = dfks, aes(x=cumpop, y=ks), color='red') +
     # geom_text(data = dfks, aes(x=cumpop, y=ks, label=oc, color=datset), vjust=0) +
-    annotate("text", x=0.4, y=0.7, vjust = -0.2, label="Positive", colour = "gray") +
-    annotate("text", x=0.95, y=0.7, vjust = -0.2, label="Negative", colour = "gray") +
+    annotate("text", x=x_posi, y=0.7, vjust = -0.2, label="Posi", colour = "gray") +
+    annotate("text", x=x_neg, y=0.7, vjust = -0.2, label="Neg", colour = "gray") +
     theme_bw() +
     theme(legend.position=c(0,1),
           legend.justification=c(0,1),
@@ -262,12 +280,14 @@ plot_lift = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
 
   max_lift = dt_lift[, ceiling(max(lift,na.rm = TRUE))]
 
+  legend_xposition = 0
+  if (dt_lift[cumpop<0.1,mean(lift, na.rm = TRUE)] > dt_lift[cumpop>0.9,mean(lift, na.rm = TRUE)]) legend_xposition = 1
   # plotting
   plift = ggplot(data = dt_lift, aes(x=cumpop, color = datset)) +
     geom_line(aes(y = lift), na.rm = TRUE) +
     theme_bw() +
-    theme(legend.position=c(0,1),
-          legend.justification=c(0,1),
+    theme(legend.position=c(legend_xposition,1),
+          legend.justification=c(legend_xposition,1),
           legend.background=element_blank(),
           legend.key=element_blank(),
           legend.key.size = unit(1.5, 'lines')) +
@@ -279,7 +299,7 @@ plot_lift = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     labs(x = "% of population", y = "Lift") +
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
-    coord_fixed(ratio = 1/(max_lift),xlim = c(0,1), ylim = c(0,max_lift), expand = FALSE)
+    coord_fixed(ratio = 1/(max_lift-1),xlim = c(0,1), ylim = c(1,max_lift), expand = FALSE)
 
   return(plift)
 }
@@ -293,12 +313,16 @@ plot_gain = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
   })
   dt_gain = rbindlist(dt_gain, fill = TRUE, idcol = 'datset')
 
+  # max_ppv = dt_gain[, ceiling2(max(precision,na.rm = TRUE))]
+
+  legend_xposition = 0
+  if (dt_gain[cumpop<0.1,mean(precision, na.rm = TRUE)] > dt_gain[cumpop>0.9,mean(precision, na.rm = TRUE)]) legend_xposition = 1
   # plotting
   pgain = ggplot(data = dt_gain, aes(x=cumpop, color = datset)) +
     geom_line(aes(y = precision), na.rm = TRUE) +
     theme_bw() +
-    theme(legend.position=c(0,1),
-          legend.justification=c(0,1),
+    theme(legend.position=c(legend_xposition,1),
+          legend.justification=c(legend_xposition,1),
           legend.background=element_blank(),
           legend.key=element_blank(),
           legend.key.size = unit(1.5, 'lines')) +
@@ -311,6 +335,7 @@ plot_gain = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     coord_fixed(xlim = c(0,1), ylim = c(0,1), expand = FALSE)
+    # coord_fixed(ratio = 1/(max_ppv),xlim = c(0,1), ylim = c(0,max_ppv), expand = FALSE)
 
   return(pgain)
 }
@@ -347,8 +372,8 @@ plot_roc = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     # geom_text(data = dt_cut, aes(x=ocFPR, y=ocTPR, label=oc, color=datset), vjust=1) +
     # geom_segment(aes(x=0, y=0, xend=1, yend=1), linetype = "dashed", colour="red") +
     theme_bw() +
-    theme(legend.position=c(0,0),
-          legend.justification=c(0,0),
+    theme(legend.position=c(1,0),
+          legend.justification=c(1,0),
           legend.background=element_blank(),
           legend.key=element_blank(),
           legend.key.size = unit(1.5, 'lines')) +
@@ -369,6 +394,7 @@ plot_pr = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
 
   dt_pr = lapply(dat_eva_lst, function(x) x[, .(recall, precision)][order(precision, recall)])
   dt_pr = rbindlist(dt_pr, idcol = 'datset')
+  # max_ppv = dt_pr[, ceiling2(max(precision,na.rm = TRUE))]
 
   # plot
   ppr = ggplot(dt_pr) +
@@ -389,14 +415,16 @@ plot_pr = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     coord_fixed(xlim = c(0,1), ylim = c(0,1), expand = FALSE)
+    # coord_fixed(ratio = 1/(max_ppv),xlim = c(0,1), ylim = c(0,max_ppv), expand = FALSE)
 
   return(ppr)
 }
 
 plot_lz = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
-  FN = totP = . = datset = Gini = cumpop = cumbadrate = NULL
+  FN = nP = totP = . = datset = Gini = cumpop = cumbadrate = NULL
+
   dt_lz = lapply(dat_eva_lst, function(x) {
-    x = x[, .(cumpop, cumbadrate = FN/totP)]
+    x = x[, .(cumpop, cumbadrate = cumsum(nP)/totP)]
     x = rbind(x, data.table(cumpop=0, cumbadrate=0), fill=TRUE)
     return(x[order(cumpop)])
   })
@@ -421,7 +449,7 @@ plot_lz = function(dat_eva_lst, pm=NULL, co=NULL, title=NULL, ...) {
 
   # axis, labs, theme
   plz = plz + ggtitle(paste0(title, 'Lorenz')) +
-    labs(x = "% of population", y = "% of total Neg/Posi") +
+    labs(x = "% of population", y = "% of total positive") +
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     coord_fixed(xlim = c(0,1), ylim = c(0,1), expand = FALSE)
@@ -447,6 +475,7 @@ plot_f1 = function(dat_eva_lst, pm=NULL, co=NULL, beta=1, title=NULL, ...) {
 
   # optimal cutoff
   dt_cut = dt_f[, .SD[f1 == max(f1, na.rm = TRUE)][1], by = 'datset']#[, oc := sprintf('%.4f\n(%.4f,%.4f)', round(pred,4), round(cumpop,4), round(ks,4))]
+  # max_fb = ceiling2(max(dt_f[[paste0('f',beta)]],na.rm = TRUE))
 
   # plot
   pf = ggplot(data = dt_f, aes(x=cumpop)) +
@@ -455,8 +484,8 @@ plot_f1 = function(dat_eva_lst, pm=NULL, co=NULL, beta=1, title=NULL, ...) {
     # geom_text(data = dt_cut, aes_string(x='cumpop', y=paste0('f',beta), label='oc', color='datset'), vjust=0) +
     geom_segment(data = dt_cut, aes_string(x = 'cumpop', y = 0, xend = 'cumpop', yend = paste0('f',beta), color='datset'), linetype = "dashed") +
     theme_bw() +
-    theme(legend.position=c(0,1),
-          legend.justification=c(0,1),
+    theme(legend.position=c(1,0),
+          legend.justification=c(1,0),
           legend.background=element_blank(),
           legend.key=element_blank(),
           legend.key.size = unit(1.5, 'lines')) +
@@ -468,6 +497,7 @@ plot_f1 = function(dat_eva_lst, pm=NULL, co=NULL, beta=1, title=NULL, ...) {
     scale_y_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     scale_x_continuous(labels=fmt_dcimals, breaks=number_ticks(5)) +
     coord_fixed(xlim = c(0,1), ylim = c(0,1), expand = FALSE)
+    # coord_fixed(ratio = 1/(max_fb),xlim = c(0,1), ylim = c(0,max_fb), expand = FALSE)
 
   return(pf)
 }
@@ -555,8 +585,11 @@ func_dat_labelpred = function(pred, label, title, positive, seed, ...) {
   return(dt_lst)
 }
 # dataset evaluation
-func_dat_eva = function(dt, groupnum=NULL, ...) {
-  . = label = pred = nP = nN = totP = FN = totN = TN = TP = FP = group = NULL
+func_dat_eva = function(dt, groupnum=NULL, pred_desc=FALSE, ...) {
+  . = label = pred = nP = nN = pred2 = nP2 = nN2 = totP = FN = totN = TN = TP = FP = group = NULL
+       # pred #  P |  N
+  # actual #P # TP | FN
+           #N # FP | TN
 
   # nP, number of Positive samples in each predicted prob
   # nN, number of Negative samples in each predicted prob
@@ -574,16 +607,39 @@ func_dat_eva = function(dt, groupnum=NULL, ...) {
 
   dt_ev = dt[, .(nP = sum(label==1), nN = sum(label==0)), keyby = pred]
   if (!(is.null(groupnum) || total_num <= groupnum)) {
-    dt_ev = dt_ev[, pred := ceiling(cumsum(nP+nN)/(total_num/groupnum))
-                ][, .(nP = sum(nP), nN = sum(nN)), keyby = pred ]
+    dt_ev = dt_ev[
+      , pred2 := ceiling(cumsum(nP+nN)/(total_num/groupnum))
+    ][,`:=`(
+      nP2 = sum(nP), nN2 = sum(nN)
+    ), by = pred2
+    ][, .SD[.N], by = pred2
+    ][, .(pred, nP = nP2, nN = nN2)]
   }
+  dt_ev = dt_ev[, `:=`(totP = sum(nP), totN = sum(nN))]
 
-  dt_ev = dt_ev[, `:=`(FN = cumsum(nP), TN = cumsum(nN),
-                    totP = sum(nP), totN = sum(nN))
-           ][, `:=`(TP = totP-FN, FP = totN-TN)
-           ][, `:=`(TPR = TP/totP, FPR = FP/totN,
-                    precision = TP/(TP+FP), recall = TP/totP,
-                    cumpop = (FN+TN)/(totP+totN))][]
+  if (pred_desc) {
+    dt_ev = dt_ev[
+      order(-pred)
+    ][, `:=`(TP = cumsum(nP), FP = cumsum(nN))
+    ][, `:=`(
+      FN = totP-TP,
+      TN = totN-FP,
+      cumpop = (TP+FP)/(totP+totN)
+    )]
+  } else {
+    dt_ev = dt_ev[
+      order(pred)
+    ][, `:=`(FN = cumsum(nP), TN = cumsum(nN))
+    ][, `:=`(
+      TP = totP-FN,
+      FP = totN-TN,
+      cumpop = (FN+TN)/(totP+totN)
+    )]
+  }
+  dt_ev = dt_ev[, `:=`(
+    TPR = TP/totP, FPR = FP/totN,
+    precision = TP/(TP+FP), recall = TP/totP
+  )][]
 
   return(dt_ev)
 }
@@ -620,15 +676,15 @@ pf_metrics = function(dt_lst, dt_ev_lst, all_metrics, sel_metrics) {
   return(list(all_pm=all_pm, sel_pm=sel_pm))
 }
 # optimal cutoffs
-pf_cutoffs = function(dt_ev_lst) {
+pf_cutoffs = function(dt_ev_lst, pred_desc = FALSE) {
   . = pred = cumpop = f1 = f2 = FPR = TPR = NULL
   co = list()
   for (n in names(dt_ev_lst)) {
     con = list(
-      max_f1  = cutoff_fbeta(dt_ev_lst[[n]],1)[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',cumpop,f1))],
-      max_f2  = cutoff_fbeta(dt_ev_lst[[n]],2)[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',cumpop,f2))],
-      ks  = cutoff_ks(dt_ev_lst[[n]])[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',cumpop,ks))],
-      roc = cutoff_roc(dt_ev_lst[[n]])[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',FPR,TPR))] )
+      max_f1  = cutoff_fbeta(dt_ev_lst[[n]],1, pred_desc=pred_desc)[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',cumpop,f1))],
+      max_f2  = cutoff_fbeta(dt_ev_lst[[n]],2, pred_desc=pred_desc)[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',cumpop,f2))],
+      ks  = cutoff_ks(dt_ev_lst[[n]], pred_desc=pred_desc)[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',cumpop,ks))],
+      roc = cutoff_roc(dt_ev_lst[[n]], pred_desc=pred_desc)[,.(pred_threshold=pred, coord = sprintf('(%.2f,%.2f)',FPR,TPR))] )
 
     co[[n]] = rbindlist(con, idcol = 'metrics')
   }
@@ -647,7 +703,8 @@ pf_cutoffs = function(dt_ev_lst) {
 #' @param confusion_matrix Logical, whether to create a confusion matrix. Defaults to TRUE.
 #' @param threshold Confusion matrix threshold. Defaults to the pred on maximum F1.
 #' @param show_plot Defaults to c('ks', 'roc'). Accepted values including c('ks', 'lift', 'gain', 'roc', 'lz', 'pr', 'f1', 'density').
-#' @param positive Value of positive class, Defaults to "bad|1".
+#' @param pred_desc whether to sort the argument of pred in descending order. Defaults to TRUE.
+#' @param positive Value of positive class. Defaults to "bad|1".
 #' @param ... Additional parameters.
 #'
 #' @return A list of binomial metric, confusion matrix and graphics
@@ -756,7 +813,7 @@ pf_cutoffs = function(dt_ev_lst) {
 #' @importFrom utils head tail
 #' @export
 #'
-perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'logloss', 'r2', 'ks', 'auc', 'gini'), confusion_matrix=TRUE, threshold=NULL, show_plot=c('ks', 'roc'), positive="bad|1", ...) {
+perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'logloss', 'r2', 'ks', 'auc', 'gini'), confusion_matrix=FALSE, threshold=NULL, show_plot=c('ks', 'lift'), pred_desc=TRUE, positive="bad|1", ...) {
   . = f1 = NULL
 
   kwargs = list(...)
@@ -787,9 +844,9 @@ perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'l
     return(x)
   })
   # datasets for evaluation
-  dt_ev_lst = lapply(dt_lst, function(x) func_dat_eva(x, groupnum = NULL))
+  dt_ev_lst = lapply(dt_lst, function(x) func_dat_eva(x, groupnum = NULL, pred_desc = pred_desc))
   # cutoff, Maximum Metrics
-  co = pf_cutoffs(dt_ev_lst)
+  co = pf_cutoffs(dt_ev_lst, pred_desc = pred_desc)
 
 
   # return list
@@ -831,7 +888,7 @@ perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'l
     # datasets for visualization
     groupnum = kwargs[["groupnum"]]
     if (is.null(groupnum)) groupnum = 1000
-    dt_ev_lst_plot = lapply(dt_lst, function(x) func_dat_eva(x, groupnum = groupnum))
+    dt_ev_lst_plot = lapply(dt_lst, function(x) func_dat_eva(x, groupnum = groupnum, pred_desc = pred_desc))
     # plot
     plist = lapply(paste0('plot_', show_plot), function(x) do.call(x, args = list(dat_eva_lst = dt_ev_lst_plot, dt_lst=dt_lst, pm=pm_lst$all_pm, co=co, title=title, positive=positive)))
     # return ggpubr, cowplot and gridExtra
@@ -938,6 +995,7 @@ gains_table_format = function(dt_distr, ret_bin_avg=FALSE) {
 #' @param bin_num Integer, the number of score bins. Defaults to 10. If it is 'max', then individual scores are used as bins.
 #' @param method The score is binning by equal frequency or equal width. Accepted values are 'freq' and 'width'. Defaults to 'freq'.
 #' @param width_by Number, increment of the score breaks when method is set as 'width'. If it is provided the above parameter bin_num will not be used. Defaults to NULL.
+#' @param breaks_by The name of data set to create breakpoints. Defaults to the first data set. Or numeric values to set breakpoints manually.
 #' @param positive Value of positive class, Defaults to "bad|1".
 #' @param ... Additional parameters.
 #'
@@ -1017,7 +1075,7 @@ gains_table_format = function(dt_distr, ret_bin_avg=FALSE) {
 #' }
 #'
 #' @export
-gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, positive='bad|1', ...) {
+gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, breaks_by=NULL, positive='bad|1', ...) {
   . = V1 = V2 = bad = bin = count = datset = group = NULL
 
   # arguments
@@ -1070,31 +1128,50 @@ gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, p
     # in each value
     dt_psi = copy(dt_sl)[, bin := factor(score)]
   } else {
+    # set breakpoints manually.
+    if (inherits(breaks_by, 'numeric')) {
+      breaks_by = breaks_by[between(breaks_by, dt_sl[, min(score)], dt_sl[, max(score)])]
+      if (length(breaks_by)==0) breaks_by = NULL
+      brkp = breaks_by
+    }
+
+    # set breakpoints basedon dataset specified
+    if (is.null(breaks_by) | inherits(breaks_by, 'character')) {
+    # the name of dataset to create breakpoints, defaults to the name of 1st dataset
+    if (is.null(breaks_by)) breaks_by = dt_sl[1,datset]
+    breaks_by = intersect(breaks_by, dt_sl[, unique(datset)])
+    if (length(breaks_by) == 0) breaks_by = dt_sl[1,datset]
+
+    # the dataset of score/label to create breakpoints
+    dt_sl_brkp = dt_sl[datset %in% breaks_by]
+    # create breakpoints by method freq/width
     if (method == 'freq') {
       # in equal frequency
-      brkp = copy(dt_sl)[order(score)
+      brkp = copy(dt_sl_brkp)[order(score)
                          ][, group := ceiling(.I/(.N/bin_num))
                          ][, .(score = score[1]), by = group
-                         ][, c(-Inf, score[-1], Inf)]
+                         ][, score[-1]]
 
     } else if (method == 'width') {
-
+      # in equal width
       if (is.null(width_by) || width_by > max(score)-min(score)) {
         # in equal width
-        minmax = dt_sl[, sapply(.SD, function(x) list(min(x), max(x))), by=datset, .SDcols=c('score')
+        minmax = dt_sl_brkp[, sapply(.SD, function(x) list(min(x), max(x))), by=datset, .SDcols=c('score')
                        ][,.(mins = max(V1), maxs = min(V2))] # choose min of max value, and max of min value by dataset
 
         brkp = seq(minmax$mins, minmax$maxs, length.out = bin_num+1)
       } else {
-        minmax = quantile(score, c(0.02, 0.98))
+        minmax = dt_sl_brkp[, quantile(score, c(0.02, 0.98))]
         minmax = round(minmax/width_by) * width_by
         brkp = seq(minmax[[1]]-width_by, minmax[[2]]+width_by, by = width_by)
       }
 
       if (is_score) brkp = round(brkp)
-      brkp = c(-Inf, brkp[-c(1, length(brkp))], Inf)
+      brkp = brkp[-c(1, length(brkp))]
     }
-    dt_psi = dt_sl[, bin := cut(score, unique(brkp), right = FALSE, dig.lab = 10, ordered_result = F)]
+    }
+    brkp = unique(c(-Inf, brkp, Inf))
+    dt_psi = dt_sl[, bin := cut(score, brkp, right = FALSE, dig.lab = 10, ordered_result = F)]
   }
   if (return_dt_psi) return(dt_psi) # innter result usded in perf_psi function
 
@@ -1220,6 +1297,7 @@ perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad
 
   seed = kwargs[['seed']]
   if (is.null(seed)) seed = 618
+  breaks_by = kwargs[['breaks_by']]
 
   return_distr_dat = kwargs[['return_distr_dat']]
   if (is.null(return_distr_dat)) return_distr_dat = FALSE
@@ -1249,7 +1327,7 @@ perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad
     sn_is_totalscore = dt_sn[,length(unique(score)) > threshold_variable]
     bin_num <- ifelse(sn_is_totalscore, 10, 'max')
 
-    dt_psi = gains_table(score=NULL, label=NULL, bin_num=10, method=method, positive = positive, return_dt_psi=TRUE, dt_sl=dt_sn)
+    dt_psi = gains_table(score=NULL, label=NULL, bin_num=10, method=method, positive = positive, return_dt_psi=TRUE, dt_sl=dt_sn, breaks_by = breaks_by)
 
 
     # return list
