@@ -6,7 +6,7 @@
 [![](http://cranlogs.r-pkg.org/badges/scorecard)](https://cran.r-project.org/package=scorecard)
 
 
-The goal of `scorecard` package is to make the development of the traditional credit risk scorecard model easier and efficient by providing functions for some common tasks that summarized in below. This package can also used in the development of machine learning models on binomial classification. 
+The goal of `scorecard` package is to make the development of the traditional credit risk scorecard model easier and efficient by providing functions for some common tasks that summarized in below. This package can also used in the development of machine learning models on binary classification. 
 
 - data preprocessing (`split_df`, `replace_na`, `one_hot`, `var_scale`)
 - weight of evidence (woe) binning (`woebin`, `woebin_plot`, `woebin_adj`, `woebin_ply`)
@@ -43,7 +43,7 @@ data("germancredit")
 # filter variable via missing rate, iv, identical value rate
 dt_f = var_filter(germancredit, y="creditability")
 # breaking dt into train and test
-dt_list = split_df(dt_f, y="creditability", ratio = c(0.6, 0.4), seed = 30)
+dt_list = split_df(dt_f, y="creditability", ratios = c(0.6, 0.4), seed = 30)
 label_list = lapply(dt_list, function(x) x$creditability)
 
 # woe binning ------
@@ -90,3 +90,4 @@ score_list = lapply(dt_list, function(x) scorecard_ply(x, card))
 perf_psi(score = score_list, label = label_list)
 
 ```
+

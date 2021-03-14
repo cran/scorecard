@@ -4,7 +4,7 @@
 \alias{scorecard2}
 \title{Creating a Scorecard}
 \usage{
-scorecard2(bins, dt, y, x = NULL, badprob_pop = NULL, points0 = 600,
+scorecard2(bins, dt, y, x = NULL, posprob_pop = NULL, points0 = 600,
   odds0 = 1/19, pdo = 50, basepoints_eq0 = FALSE, digits = 0,
   return_prob = FALSE, positive = "bad|1", ...)
 }
@@ -17,7 +17,7 @@ scorecard2(bins, dt, y, x = NULL, badprob_pop = NULL, points0 = 600,
 
 \item{x}{Name of x variables. If it is NULL, then all variables in bins are used. Defaults to NULL.}
 
-\item{badprob_pop}{Bad probability of population. Accepted range: 0-1,  default to NULL. If it is not NULL, the model will adjust for oversampling.}
+\item{posprob_pop}{Positive probability of population. Accepted range: 0-1,  default to NULL. If it is not NULL, the model will adjust for oversampling.}
 
 \item{points0}{Target points, default 600.}
 
@@ -55,19 +55,10 @@ dt_woe = woebin_ply(dt_sel, bins)
 
 # glm ------
 m = glm(creditability ~ ., family = binomial(), data = dt_woe)
-# summary(m)
 
 # Select a formula-based model by AIC
 m_step = step(m, direction="both", trace=FALSE)
 m = eval(m_step$call)
-# summary(m)
-
-# predicted proability
-# dt_pred = predict(m, type='response', dt_woe)
-
-# performace
-# ks & roc plot
-# perf_eva(dt_woe$creditability, dt_pred)
 
 # scorecard
 # Example I # creat a scorecard

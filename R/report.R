@@ -146,7 +146,7 @@ report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_rep
   bin_num = ifelse('bin_num' %in% names(kwargs), kwargs$bin_num, 10)
   bin_type = ifelse('bin_type' %in% names(kwargs), kwargs$bin_type, 'freq')
   gains_tbl = gains_table(score = rbindlist(score_lst), label = rbindlist(label_list), bin_num = bin_num, bin_type=bin_type)
-  gains_table_cols = c('dataset', 'bin', 'count', 'cumulative count', 'good', 'cumulative good', 'bad', 'cumulative bad', 'count distribution', 'bad probability', 'approval rate', 'cumulative bad probability')
+  gains_table_cols = c('dataset', 'bin', 'count', 'cumulative count', 'negative', 'cumulative negative', 'positive', 'cumulative positive', 'count distribution', 'positive probability', 'approval rate', 'cumulative positive probability')
 
 
   wb <- createWorkbook()
@@ -158,11 +158,13 @@ report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_rep
   sample_info <- lapply(dat_lst, function(x) {
     data.table(`sample size` = nrow(x),
                `feature size` = ncol(x)-1,
-               `bad rate` = sum(x[[y]])/nrow(x))
+               `positive rate` = sum(x[[y]])/nrow(x))
   })
+  dt_dtinfo = rbindlist(sample_info, idcol = 'dataset')
+  dt_xdea = describe(rbindlist(dat_lst))
 
-  writeData(wb, sheet, rbindlist(sample_info, idcol = 'dataset'), startRow=1, startCol=1, colNames=T)
-
+  writeData(wb, sheet, dt_dtinfo, startRow=1, startCol=1, colNames=T)
+  writeData(wb, sheet, dt_xdea, startRow=nrow(dt_dtinfo)+4, startCol=1, colNames=T)
 
   # model coefficients ------
   n = n+1
@@ -171,10 +173,10 @@ report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_rep
 
   dt_vif = vif(m, merge_coef = TRUE)[, gvif := round(gvif, 4)]
   dt_iv = iv(dat_woe_lst[[1]][,c(paste0(x,"_woe"), y),with=FALSE], y, order = FALSE)[, info_value := round(info_value, 4)]
-  dt_mr = data.table(variable=paste0(x,'_woe'), missing_rate=dat_lst[[1]][,x,with=FALSE][, sapply(.SD, function(x) sum(is.na(x))/.N)])
+  # dt_mr = data.table(variable=paste0(x,'_woe'), missing_rate=dat_lst[[1]][,x,with=FALSE][, sapply(.SD, function(x) sum(is.na(x))/.N)])
 
   sum_tbl = Reduce(
-    function(x,y) merge(x,y, all=TRUE, by='variable', sort=FALSE), list(dt_vif, dt_iv, dt_mr)
+    function(x,y) merge(x,y, all.x=TRUE, by='variable', sort=FALSE), list(dt_vif, dt_iv, copy(dt_xdea)[, variable := paste0(variable, '_woe')])
   )[, variable := sub('_woe$', '', variable)]
   if (!is.null(x_name)) sum_tbl = merge(x_name, sum_tbl, by = 'variable', sort = FALSE, all = TRUE)[c(.N, seq_len(.N-1)),]
 
@@ -191,7 +193,7 @@ report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_rep
   eva_tbl = rbindlist(m_perf$binomial_metric, idcol = 'dataset')
   writeData(wb, sheet, eva_tbl, startRow=1, startCol=1, colNames=T)
 
-  show_plot = c("ks","roc")
+  show_plot = c("ks","lift")
   if ('show_plot' %in% names(kwargs)) show_plot = kwargs$show_plot
   perf_eva(pred = pred_lst, label = label_list, confusion_matrix = FALSE, binomial_metric = NULL, show_plot = show_plot)$pic
   Sys.sleep(2)
