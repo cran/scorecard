@@ -349,3 +349,54 @@ brk_txt2vector = function(brk) {
 
   return(v)
 }
+brk_numx_init = function(brk, xvalue) {
+  brk = setdiff(unique(brk), c(NA, Inf, -Inf))
+  xval = unique(xvalue)
+
+  if (getoption_cutright()) {
+    brk=sort(brk[(brk< max(xval, na.rm=TRUE)) & (brk>=min(xval, na.rm=TRUE))])
+  } else {
+    brk=sort(brk[(brk<=max(xval, na.rm=TRUE)) & (brk> min(xval, na.rm=TRUE))])
+  }
+
+  brk = unique(c(-Inf, brk, Inf))
+  return(brk)
+}
+
+getoption_cutright = function() {
+  cut_right = getOption('scorecard.bin_close_right')
+  if (is.null(cut_right)) cut_right = FALSE
+  return(cut_right)
+}
+binpatttern_isbin = function() {
+  pstr = '\\['
+  if (getoption_cutright()) pstr = '\\('
+  return(pstr)
+}
+binpattern_left_brkp = function() {
+  pstr = "^\\[(.*),.+"
+  if (getoption_cutright()) pstr = "^\\((.*),.+"
+  return(pstr)
+}
+binpattern_leftright_brkp = function() {
+  pstr = "^\\[(.*), *(.*)\\)"
+  if (getoption_cutright()) pstr = "^\\((.*), *(.*)\\]"
+  return(pstr)
+}
+binpattern_leftrightbrkp_missing = function() {
+  pstr = "^\\[(.*), *(.*)\\)((%,%missing)*)"
+  if (getoption_cutright()) pstr = "^\\((.*), *(.*)\\]((%,%missing)*)"
+  return(pstr)
+}
+binpattern_multibin = function() {
+  pstr = "^(\\[.+?,).+,(.+?\\))$"
+  if (getoption_cutright()) pstr = "^(\\(.+?,).+,(.+?\\])$"
+  return(pstr)
+}
+
+get_brkp_bin = function(bin) {
+  x = '\\1'
+  if (getoption_cutright()) x = '\\2'
+  as.numeric(sub(binpattern_leftright_brkp(), x, bin))
+}
+

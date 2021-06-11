@@ -794,7 +794,7 @@ pf_cutoffs = function(dt_ev_lst, pred_desc = FALSE) {
 #' psi1$pic  # pic of score distribution
 #'
 #' # Example II # both total and variable psi
-#' psi2 = perf_psi(score = score_list, label = label_list)
+#' psi2 = perf_psi(score = score_list2, label = label_list)
 #' # psi2$psi  # psi data frame
 #' # psi2$pic  # pic of score distribution
 #'
@@ -901,12 +901,10 @@ perf_eva = function(pred, label, title=NULL, binomial_metric=c('mse', 'rmse', 'l
 
 # psi ------
 # PSI function
-psi_metric = function(dt_sn, names_datset) {
-  A=E=logAE=bin_psi=NULL
+psicsi_metric = function(dt_sn, names_datset, is_totalscore=TRUE) {
+  A=E=logAE=bin_psi=bin= AE = bin_PSI = NULL
   # psi = sum((Actual% - Expected%)*ln(Actual%/Expected%))
-
   # dat = copy(dat)[,y:=NULL][complete.cases(dat),]
-  AE = bin_PSI = NULL
 
   # data frame of bin, actual, expected
   dt_bae = dcast(
@@ -914,12 +912,20 @@ psi_metric = function(dt_sn, names_datset) {
     bin ~ datset, value.var="N", fill = 0.99
   )
 
-  # psi
-  psi_dt = dt_bae[
-    , (c("A","E")) := lapply(.SD, function(x) x/sum(x)), .SDcols = names_datset
-  ][, `:=`(AE = A-E, logAE = log(A/E))
-  ][, `:=`(bin_psi = AE*logAE)
-  ][, sum(bin_psi)]
+
+  if (is_totalscore) {
+    # psi
+    psi_dt = dt_bae[
+      , (c("A","E")) := lapply(.SD, function(x) x/sum(x)), .SDcols = names_datset
+    ][, `:=`(AE = A-E, logAE = log(A/E))
+    ][, sum(AE*logAE)]
+  } else {
+    # csi
+    psi_dt = dt_bae[
+      , (c("A","E")) := lapply(.SD, function(x) x/sum(x)), .SDcols = names_datset
+    ][, sum((A-E) * as.numeric(as.character(bin)))]
+  }
+
 
   return(psi_dt)
 }
@@ -936,8 +942,8 @@ psi_plot = function(dt_psi, psi_sn, title, sn, line_color = 'blue', bar_color = 
        ][, `:=`(distr = N/sum(N), posprob = pos/N), by = 'datset'
        ][, `:=`(posprob2 = posprob*max(distr)), by = "datset"
        ][, `:=`(
-         bin1 = as.numeric(sub("\\[(.+),(.+)\\)", "\\1", bin)),
-         bin2 = as.numeric(sub("\\[(.+),(.+)\\)", "\\2", bin))
+         bin1 = as.numeric(sub(binpattern_leftright_brkp(), "\\1", bin)),
+         bin2 = as.numeric(sub(binpattern_leftright_brkp(), "\\2", bin))
       )][, midbin := (bin1+bin2)/2 ][]
 
   # plot
@@ -1059,7 +1065,7 @@ gains_table_format = function(dt_distr, ret_bin_avg=FALSE) {
 #' psi1$pic  # pic of score distribution
 #'
 #' # Example II # both total and variable psi
-#' psi2 = perf_psi(score = score_list, label = label_list)
+#' psi2 = perf_psi(score = score_list2, label = label_list)
 #' # psi2$psi  # psi data frame
 #' # psi2$pic  # pic of score distribution
 #'
@@ -1190,10 +1196,10 @@ gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, b
 
 #' PSI
 #'
-#' \code{perf_psi} calculates population stability index (PSI) for both total credit score and variables. It can also creates graphics to display score distribution and positive rate trends.
+#' \code{perf_psi} calculates population stability index (PSI) for total credit score and Characteristic Stability Index (CSI) for variables. It can also creates graphics to display score distribution and positive rate trends.
 #'
-#' @param score A list of credit score for actual and expected data samples. For example, score = list(actual = scoreA, expect = scoreE).
-#' @param label A list of label value for actual and expected data samples. For example, label = list(actual = labelA, expect = labelE). Defaults to NULL.
+#' @param score A list of credit score for actual and expected data samples. For example, score = list(expect = scoreE, actual = scoreA).
+#' @param label A list of label value for actual and expected data samples. For example, label = list(expect = labelE, actual = labelA). Defaults to NULL.
 #' @param title Title of plot, Defaults to NULL.
 #' @param show_plot Logical. Defaults to TRUE.
 #' @param positive Value of positive class, Defaults to "bad|1".
@@ -1205,6 +1211,8 @@ gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, b
 #' @seealso \code{\link{perf_eva}} \code{\link{gains_table}}
 #'
 #' @details The population stability index (PSI) formula is displayed below: \deqn{PSI = \sum((Actual\% - Expected\%)*(\ln(\frac{Actual\%}{Expected\%}))).} The rule of thumb for the PSI is as follows: Less than 0.1 inference insignificant change, no action required; 0.1 - 0.25 inference some minor change, check other scorecard monitoring metrics; Greater than 0.25 inference major shift in population, need to delve deeper.
+#'
+#' Characteristic Stability Index (CSI) formula is displayed below: \deqn{CSI = \sum((Actual\% - Expected\%)*score).}
 #'
 #'
 #' @examples
@@ -1267,7 +1275,7 @@ gains_table = function(score, label, bin_num=10, method='freq', width_by=NULL, b
 #' #          line_color='#FC8D59', bar_color=c('#FFFFBF', '#99D594'))
 #'
 #' # Example II # both total and variable psi
-#' psi2 = perf_psi(score = score_list, label = label_list)
+#' psi2 = perf_psi(score = score_list2, label = label_list)
 #' # psi2$psi  # psi data frame
 #' # psi2$pic  # pic of score distribution
 #'
@@ -1335,8 +1343,10 @@ perf_psi = function(score, label=NULL, title=NULL, show_plot=TRUE, positive="bad
     for (i in names_datset[-1]) {
       # population stability index
       names_dts = c(names_datset[1], i)
-      psi_sn = psi_metric(dt_psi[datset %in% names_dts], names_dts)
-      temp_psi[[paste0(names_dts, collapse = '_')]] = data.table(psi = psi_sn)
+      psi_sn = psicsi_metric(dt_psi[datset %in% names_dts], names_dts, is_totalscore = sn_is_totalscore)
+      dt_psi_sn = data.table(psi = psi_sn)
+      if (!sn_is_totalscore) dt_psi_sn = data.table(csi = psi_sn)
+      temp_psi[[paste0(names_dts, collapse = '_')]] = dt_psi_sn
 
       # pic
       temp_pic = NULL

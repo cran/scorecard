@@ -58,14 +58,14 @@ check_empty_bins = function(dtm, binning) {
   ## break points from bin
   breaks_list = lapply(
     list(left="\\1", right="\\2"),
-    function(x) setdiff(sub("^\\[(.*), *(.*)\\)", x, unique(binning$bin)), c("Inf","-Inf")) )
+    function(x) setdiff(sub(binpattern_leftright_brkp(), x, unique(binning$bin)), c("Inf","-Inf")) )
   ## if there are empty bins
   if (!setequal(breaks_list$left, breaks_list$right)) {
     bstbrks = unique(c(-Inf, unique(breaks_list$right), Inf))
     binning = dtm[
-      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)
-    ][, .(neg = sum(y==0), pos = sum(y==1), variable=unique(variable)) , by = .(bin)
-    ][order(bin)]
+      , bin := cut(value, bstbrks, right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE)
+    ][, .(count=.N, neg = sum(y==0), pos = sum(y==1), variable=unique(variable)) , keyby = .(bin)
+    ]
 
     # warning( paste0("The break points are modified into \'", paste0(breaks_list$right, collapse = ", "), "\'. There are empty bins based on the provided break points." ) )
   }
@@ -100,9 +100,9 @@ check_zero_negpos = function(dtm, binning, count_distr_limit = NULL) {
   # format bin
   if (is.numeric(dtm[,value])) {
     binning = binning[
-      grepl("%,%",bin), bin := sub("^(\\[.+?,).+,(.+?\\))$", "\\1\\2", bin)
+      grepl("%,%",bin), bin := sub(binpattern_multibin(), "\\1\\2", bin)
       ][bin == 'missing', brkp := NA
-      ][bin != 'missing', brkp := as.numeric(sub("^\\[(.*),.+", "\\1", bin))]
+      ][bin != 'missing', brkp := get_brkp_bin(bin)]
   }
   return(binning)
 }
@@ -137,9 +137,9 @@ check_count_distri = function(dtm, binning, count_distr_limit) {
   # format bin
   if (is.numeric(dtm[,value])) {
     binning = binning[
-      grepl("%,%",bin), bin := sub("^(\\[.+?,).+,(.+?\\))$", "\\1\\2", bin)
+      grepl("%,%",bin), bin := sub(binpattern_multibin(), "\\1\\2", bin)
       ][bin == 'missing', brkp := NA
-        ][bin != 'missing', brkp := as.numeric(sub("^\\[(.*),.+", "\\1", bin))]
+        ][bin != 'missing', brkp := get_brkp_bin(bin)]
   }
   return(binning)
 }
@@ -163,10 +163,10 @@ woebin2_breaks = function(dtm, breaks, spl_val) {
 
   # binning
   if (is.numeric(dtm[,value])) {
-    bstbrks = c(-Inf, setdiff(unique(bk_df$value), c(NA, Inf, -Inf)), Inf)
+    bstbrks = brk_numx_init(unique(bk_df$value), dtm$value)
 
     binning = dtm[
-      , bin := cut(value, bstbrks, right = FALSE, dig.lab = 10, ordered_result = FALSE)
+      , bin := cut(value, bstbrks, right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE)
     ][, .(count = .N, neg = sum(y==0), pos = sum(y==1), variable=unique(variable)) , by = .(bin)
     ][order(bin)]
     # check empty bins
@@ -176,7 +176,7 @@ woebin2_breaks = function(dtm, breaks, spl_val) {
     # merge binning with bk_df
     if (bk_df[is.na(value),.N] == 1) {
       binning = merge(
-        binning[, value:=sub("^\\[(.*), *(.*)\\)","\\2",bin)],
+        binning[, value:=sub(binpattern_leftright_brkp(),"\\2",bin)],
         bk_df,
         all.x = TRUE, by="value"
       )[order(rowid,value)][, bin:=ifelse(is.na(bin), "missing", as.character(bin))
@@ -239,7 +239,6 @@ woebin2_init_bin = function(dtm, init_count_distr, breaks, spl_val) {
     xrng = quantile(xvalue, probs = c(prob_down, prob_up), na.rm = TRUE)
     xvalue_rm_outlier = xvalue[which(xvalue >= xrng[1]-3*iqr & xvalue <= xrng[2]+3*iqr)]
 
-
     # number of initial binning
     n = trunc(1/init_count_distr)
     len_uniq_x = length(setdiff(unique(xvalue_rm_outlier), c(NA,Inf,-Inf)))
@@ -251,20 +250,19 @@ woebin2_init_bin = function(dtm, init_count_distr, breaks, spl_val) {
     } else {
       brk = suppressWarnings(pretty(xvalue_rm_outlier, n))
     }
-    brk = sort(brk[(brk <= max(xvalue, na.rm =TRUE)) & (brk > min(xvalue, na.rm =TRUE))])
-    brk = unique(c(-Inf, brk, Inf))
+    brk = brk_numx_init(brk, xvalue)
     if (anyNA(xvalue)) brk = c(brk, NA)
 
     # initial binning datatable
     init_bin = dtm[
-      , bin := cut(value, brk, right = FALSE, dig.lab = 10, ordered_result = FALSE)
+      , bin := cut(value, brk, right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE)
     ][, .(neg = sum(y==0), pos = sum(y==1), variable=unique(variable)) , by = bin
     ][order(bin)]
     # check empty bins
     init_bin = check_empty_bins(dtm, init_bin)
 
     init_bin = init_bin[
-      , `:=`(brkp = as.numeric( sub("^\\[(.*),.+", "\\1", bin)), posprob = pos/(neg+pos))
+      , `:=`(brkp = get_brkp_bin(bin), posprob = pos/(neg+pos))
     ][, .(variable, bin, brkp, neg, pos, posprob)]
 
   } else if ( is.logical(dtm[,value]) || is.factor(dtm[,value]) || is.character(dtm[,value]) ) {
@@ -320,7 +318,7 @@ woebin2_tree_add_1brkp = function(dtm, initial_binning, count_distr_limit, bestb
 
       # best break datatable
       init_bin_all_breaks = init_bin_all_breaks[
-        , paste0("bstbin",i) := cut(brkp, c(-Inf, bestbreaks_i, Inf), right = FALSE, dig.lab = 10, ordered_result = FALSE) ]
+        , paste0("bstbin",i) := cut(brkp, c(-Inf, bestbreaks_i, Inf), right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE) ]
     }
 
     # best break dt
@@ -341,7 +339,7 @@ woebin2_tree_add_1brkp = function(dtm, initial_binning, count_distr_limit, bestb
 
     if ( is.numeric(dtm[,value]) ) {
       binning_1bst_brk = initial_binning[
-        , bstbin := cut(brkp, c(-Inf, bestbreaks, Inf), right = FALSE, dig.lab = 10, ordered_result = FALSE)
+        , bstbin := cut(brkp, c(-Inf, bestbreaks, Inf), right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE)
         ][, .(variable=unique(variable), bin=unique(bstbin), neg = sum(neg), pos = sum(pos)) , by = bstbin
           ]
 
@@ -350,14 +348,14 @@ woebin2_tree_add_1brkp = function(dtm, initial_binning, count_distr_limit, bestb
       bestbreaks = setdiff(bestbreaks, min(initial_binning[,brkp]))
 
       binning_1bst_brk = initial_binning[
-        , bstbin := cut(brkp, c(-Inf, bestbreaks, Inf), right = FALSE,dig.lab = 10, ordered_result = FALSE)
+        , bstbin := cut(brkp, c(-Inf, bestbreaks, Inf), right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE)
         ][, .(variable=unique(variable), bin = paste0(bin, collapse = "%,%"), neg = sum(neg), pos = sum(pos)), by = bstbin ]
     }
 
     binning_1bst_brk = binning_1bst_brk[
       order(bstbin)
       ][, total_iv := iv_01(neg, pos)
-        ][, bstbrkp := as.numeric( sub("^\\[(.*),.+", "\\1", bstbin) )
+        ][, bstbrkp := get_brkp_bin(bstbin)
           ][, .(variable, bin, bstbin, bstbrkp, neg, pos, total_iv)]
 
     return(binning_1bst_brk)
@@ -411,12 +409,12 @@ woebin2_tree = function(
   # best breaks from three to n+1 bins
   binning_tree = NULL
   while ( (IVchg >= stop_limit) & (step_num+1 <= min(bin_num_limit, len_brks)) ) {
-    binning_tree = woebin2_tree_add_1brkp(dtm, initial_binning, count_distr_limit, bestbreaks)
+    binning_tree = woebin2_tree_add_1brkp(dtm, copy(initial_binning), count_distr_limit, bestbreaks)
     # print(binning_tree)
 
     # update parameters
     ## best breaks
-    bestbreaks = binning_tree[bstbrkp != -Inf & !is.na(bstbrkp), bstbrkp]
+    bestbreaks = binning_tree[!(bstbrkp %in% c(-Inf, Inf)) & !is.na(bstbrkp), bstbrkp]
     ## information value
     IVt2 = binning_tree[1, total_iv]
     IVchg = IVt2/IVt1-1 ## ratio gain
@@ -544,7 +542,7 @@ woebin2_chimerge = function(
 
   # format bin # remove (.+\\)%,%\\[.+,)
   if (is.numeric(dtm[,value])) {
-    binning_chisq = binning_chisq[grepl("%,%",bin), bin := sub("^(\\[.+?,).+,(.+?\\))$", "\\1\\2", bin)]
+    binning_chisq = binning_chisq[grepl("%,%",bin), bin := sub(binpattern_multibin(), "\\1\\2", bin)]
   }
 
   return(list(binning_sv=binning_sv, binning=binning_chisq[, count := neg + pos]))
@@ -567,27 +565,32 @@ woebin2_equal = function(dtm, init_count_distr=0.02, count_distr_limit=0.05, sto
 
 
   # breaks
-  if (bin_num_limit >= dtm[, length(unique(value))] ) {
+  unique_xvalue = dtm[, unique(value)]
+  if (bin_num_limit >= length(unique_xvalue) ) {
     # in each value
-    brkp = dtm[order(value)][, unique(value)]
-    brkp = c(-Inf, brkp[-1], Inf)
+    brkp = unique_xvalue
+
   } else {
     if (method == 'freq') {
       brkp = copy(dtm)[order(value)
-                      ][, group := ceiling(.I/(.N/bin_num_limit))
-                      ][, .(value=value[1]), by = group
-                      ][, c(-Inf, value[-1], Inf)]
+                      ][, group := ceiling(.I/(.N/bin_num_limit))]
+      if (getoption_cutright()) {
+        brkp = brkp[, .(value=value[.N]), by = group]
+      } else {
+        brkp = brkp[, .(value=value[1]), by = group]
+      }
 
     } else if (method == 'width') {
-      minmax = dtm[, .(maxv = max(value), minv = min(value))]
-      brkp = seq(minmax[,minv], minmax[,maxv], length.out = bin_num_limit+1)
-      brkp = c(-Inf, brkp[-c(1, length(brkp))], Inf)
+      brkp = seq(min(unique_xvalue, na.rm = TRUE), max(unique_xvalue, na.rm = TRUE), length.out = bin_num_limit+1)
+      brkp = brkp[-c(1, length(brkp))]
 
     }
   }
-  binning_equal = dtm[, bin := cut(value, unique(brkp), right = FALSE, dig.lab = 10, ordered_result = F)
+  brkp = brk_numx_init(brkp, unique_xvalue)
+
+  binning_equal = dtm[, bin := cut(value, unique(brkp), right = getoption_cutright(), dig.lab = 10, ordered_result = F)
               ][, .(neg = sum(y==0), pos = sum(y==1), count = .N), keyby = .(variable, bin)
-              ][, `:=`(brkp = as.numeric( sub("^\\[(.*),.+", "\\1", bin)), posprob = pos/(neg+pos))
+              ][, `:=`(brkp = get_brkp_bin(bin), posprob = pos/(neg+pos))
               ][, .(variable, bin, brkp, count, neg, pos, posprob)]
 
 
@@ -613,7 +616,7 @@ binning_format = function(binning) {
   ][, bin_iv := lapply(.SD, miv_01, pos), .SDcols = "neg"
   ][, total_iv := sum(bin_iv)
   ][, bin := ifelse(is.na(bin) | bin=="NA", "missing", as.character(bin)) # replace NA by missing
-  ][, .(variable, bin, count, count_distr=(neg+pos)/sum(neg+pos), neg, pos, posprob, woe, bin_iv, total_iv,  breaks = sub("^\\[(.*), *(.*)\\)((%,%missing)*)", "\\2\\3", bin), is_special_values=is_sv)]
+  ][, .(variable, bin, count, count_distr=(neg+pos)/sum(neg+pos), neg, pos, posprob, woe, bin_iv, total_iv,  breaks = sub(binpattern_leftrightbrkp_missing(), "\\2\\3", bin), is_special_values=is_sv)]
 
   # move missing from last row to first
   if ( "missing" %in% binning$bin ) {
@@ -694,7 +697,7 @@ bins_to_breaks = function(bins, dt, to_string=FALSE, save_name=NULL) {
 
   # breaks
   bins_breakslist = bins[
-    , bin2 := sub("^\\[(.*), *(.*)\\)((%,%missing)*)", "\\2\\3", bin)
+    , bin2 := sub(binpattern_leftrightbrkp_missing(), "\\2\\3", bin)
     ][!(bin2 %in% c("-Inf","Inf","missing")) & !is_special_values
     ][vars_class, on="variable"
     ][, .(
@@ -815,6 +818,12 @@ bins_to_breaks = function(bins, dt, to_string=FALSE, save_name=NULL) {
 #' bins2 = woebin(germancredit, y="creditability",
 #'    x=c("credit.amount","housing"), save_breaks_list='breaks_list')
 #'
+#' # Example VI
+#' # setting bin closed on the right
+#' options(scorecard.bin_close_right = TRUE)
+#' binsRight = woebin(germancredit, y = 'creditability', x = 'age.in.years')
+#' # setting bin close on the left, the default setting
+#' options(scorecard.bin_close_right = FALSE)
 #' }
 #'
 #' @import data.table foreach
@@ -1014,13 +1023,13 @@ woepoints_ply1 = function(dtx, binx, x_i, woe_points) {
   # dtx
   ## cut numeric variable
   if ( is.numeric(dtx[[x_i]]) ) {
-    binx_sv = binx[!grepl("\\[",V1)]
-    binx_other = binx[grepl("\\[",V1)]
+    binx_sv = binx[!grepl(binpatttern_isbin(),V1)]
+    binx_other = binx[grepl(binpatttern_isbin(),V1)]
 
     dtx[[x_i]] = ifelse(
       dtx[[x_i]] %in% binx_sv$V1,
       dtx[[x_i]],
-      as.character(cut(dtx[[x_i]], unique(c(-Inf, binx_other[bin != "missing", as.numeric(sub("^\\[(.*),.+", "\\1", V1))], Inf)), right = FALSE, dig.lab = 10, ordered_result = FALSE))
+      as.character(cut(dtx[[x_i]], unique(c(-Inf, binx_other[bin != "missing", get_brkp_bin(V1)], Inf)), right = getoption_cutright(), dig.lab = 10, ordered_result = FALSE))
     )
 
   }
@@ -1410,7 +1419,7 @@ woebin_adj_break_plot = function(dt, y, x_i, breaks, stop_limit, sv_i, method) {
 
 
   ## print adjust breaks
-  breaks_bin = setdiff(sub("^\\[(.*), *(.*)\\)((%,%missing)*)", "\\2\\3", bin_adj[[1]]$bin), c("-Inf","Inf","missing"))
+  breaks_bin = setdiff(sub(binpattern_leftrightbrkp_missing(), "\\2\\3", bin_adj[[1]]$bin), c("-Inf","Inf","missing"))
   breaks_bin = paste0(paste0("\"",breaks_bin,"\""), collapse=", ")
     # ifelse(
     # is.numeric(dt[[x_i]]),
