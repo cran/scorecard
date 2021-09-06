@@ -1,5 +1,5 @@
 Package: scorecard
-Version: 0.3.4
+Version: 0.3.5
 Title: Credit Risk Scorecard
 Description: 
   The `scorecard` package makes the development of credit risk scorecard 
@@ -26,8 +26,8 @@ VignetteBuilder: knitr
 RoxygenNote: 7.1.1
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2021-08-04 15:46:36 UTC; jovyan
+Packaged: 2021-09-04 07:39:02 UTC; jovyan
 Author: Shichen Xie [aut, cre]
 Maintainer: Shichen Xie <xie@shichen.name>
 Repository: CRAN
-Date/Publication: 2021-08-05 00:30:02 UTC
+Date/Publication: 2021-09-06 08:40:02 UTC

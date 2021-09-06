@@ -1,8 +1,8 @@
-61a42b7c938bf23fa92ff89a06ddf5db *DESCRIPTION
+07b234af2d973f13c57f53aac44c8f14 *DESCRIPTION
 922d7bf96837c3b2161cbaaca1cd3c4f *LICENSE
 f471848986e4f53fdb426e6d1f7532c0 *NAMESPACE
-58f08437d8bb5ae8042554f13e32e363 *NEWS.md
-41d4d6504b825c3db298db9a08051c77 *R/condition_fun.R
+a3d5d20016529258db665650abaff75e *NEWS.md
+7cb533eee1240c9b205334348afc6576 *R/condition_fun.R
 2d1ac7b0a63eb0c07c4059f68b76ce83 *R/describe.R
 e5c3074447ae1b36501cd97d28824769 *R/germancredit.R
 9d45c4a4f7e5cb05ecada46d57fb219f *R/info_ent_indx_gini.R
@@ -14,9 +14,9 @@ bcae47d88c50a1517c442a18120d3169 *R/report.R
 9ef3940fcde7c6f5a2914f6df9472f99 *R/split_df.R
 71e2d63d7eee1d70d798fa3c47fb2e17 *R/var_filter.R
 64017b4e0a3a494895d5277a5ce55562 *R/vif.R
-50bec60daa7a3e4984e96d591964d7fb *R/woebin.R
+fbe520400a2ab79d18d73e3c38d8440a *R/woebin.R
 170a9247ac8dec202ce0572b86df58b9 *README.md
-01899ac3746e1fb977415fc0ea5fb9ec *build/vignette.rds
+617a3092e8f5db4fb5ff8cfe5ed9e5ab *build/vignette.rds
 8f7d255c0c7a276d759cc8e80ea525bc *data/germancredit.RData
 3c9e2d06e8560272e30c98b0c827478b *inst/doc/demo.R
 79ca41dd2aa461d964ec0e820f610b27 *inst/doc/demo.Rmd
@@ -40,10 +40,10 @@ e16c8582f331559fefe23d32dcd6ec5a *man/perf_cv.Rd
 39dd7e401b4708e93be69a37a35047f8 *man/var_filter.Rd
 8df1da261067ad8db26724cb6b220a7d *man/var_scale.Rd
 756ff7f7d9e80fc5334ed4d2ba75f949 *man/vif.Rd
-65df08549466773071d587bcf2b6a55e *man/woebin.Rd
+dce45e8b97a009dcc3ac3d709441639e *man/woebin.Rd
 4c80a42e6366d2a341ba913405251803 *man/woebin_adj.Rd
 cc106f96968faa4ae2b06c41d664a888 *man/woebin_plot.Rd
-f4ebb3d67ff6b595b0a1341a096fe8ed *man/woebin_ply.Rd
+029e86fe99ff666e1e71c2b2183ab329 *man/woebin_ply.Rd
 635eba61cac7948c1c8bfc471ec8c751 *tests/testthat.R
 a8dbd27e8b6dc3d9e5905e0fc0452708 *tests/testthat/test_init.R
 79ca41dd2aa461d964ec0e820f610b27 *vignettes/demo.Rmd
