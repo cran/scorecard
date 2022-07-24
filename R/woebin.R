@@ -880,7 +880,7 @@ woebin = function(
   if (!is.null(max_num_bin)) bin_num_limit = max_num_bin
   # bin_close_right
   bin_close_right = getarg('bin_close_right')
-  if (!is.null(breaks_list)) cat(sprintf("[INFO] The option bin_close_right was set to %s.\n", bin_close_right, bin_close_right))
+  if (print_info & !is.null(breaks_list)) cat(sprintf("[INFO] The option bin_close_right was set to %s.\n", bin_close_right))
 
   # set dt as data.table
   dt = setDT(copy(dt))  #copy(setDT(dt))
@@ -929,7 +929,7 @@ woebin = function(
   # loop on xs
   # https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/
   # https://privefl.github.io/blog/a-guide-to-parallelism-in-r/
-  no_cores = check_no_cores(no_cores)
+  no_cores = check_no_cores(no_cores, xs_len)
 
   bins = list()
   if (!is.null(y)) {
@@ -967,22 +967,21 @@ woebin = function(
     bins <-
       foreach(
         i = seq_len(xs_len),
-        .combine = list,
-        .final = function(bs) {
-          if (xs_len==1) bs = list(bs)
-          setNames(bs, xs)
-        },
+        .combine = 'rbind',
+        # .final = function(bs) {
+        #   if (xs_len==1) bs = list(bs)
+        #   setNames(bs, xs)
+        # },
         .inorder = FALSE,
         .multicombine = TRUE,
         # .maxcombine = xs_len+1,
-        .errorhandling = "pass"#,
+        .errorhandling = "remove"#,
         # .packages	= 'data.table',
         # .verbose = TRUE
         # .export = c('dt', 'xs', 'ycol', 'breaks_list', 'special_values', 'init_count_distr', 'count_distr_limit', 'stop_limit', 'bin_num_limit', 'bin_close_right', 'method')
       ) %dopar% {
         x_i = xs[i]
         dtm = data.table(y=ycol, variable=x_i, value=dt[[x_i]])
-
         # woebining on one variable
         try(do.call('woebin2', args = list(
           dtm              = dtm,
@@ -999,10 +998,13 @@ woebin = function(
     # finish
     stopCluster(cl)
     # stopImplicitCluster()
+    bins = split(bins, by = 'variable')
+
   }
 
   # check errors in binning
-  error_variables = names(bins)[which(sapply(bins, function(x) inherits(x, 'try-error')))]
+  bins = bins[! sapply(bins, function(x) inherits(x, 'try-error'))]
+  error_variables = setdiff(xs, names(bins))
   if (length(error_variables) > 0) {
     warning(sprintf('The following columns are removed from binning results due to errors:\n%s', paste0(error_variables, collapse=', ')))
     bins = bins[setdiff(names(bins), error_variables)]
@@ -1438,7 +1440,7 @@ woebin_adj_break_plot = function(dt, y, x_i, breaks, stop_limit, sv_i, method, b
   cat("> Current breaks: ","\n",breaks_bin,"\n","\n")
 
   # print bin_adj
-  print(woebin_plot(bin_adj)[[1]])
+  print(woebin_plot(bin_adj, ...)[[1]])
 
   # # breaks
   # if (breaks == "" || is.null(breaks))
