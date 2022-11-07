@@ -121,13 +121,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -338,42 +345,63 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <div id="traditional-credit-scoring-using-logistic-regression" class="section level2">
 <h2>Traditional Credit Scoring Using Logistic Regression</h2>
-<p>After installing scorecard via instructions in the <a href="https://github.com/ShichenXie/scorecard#Installation">README</a> section, load the package into your environment.</p>
+<p>After installing scorecard via instructions in the <a href="https://github.com/ShichenXie/scorecard#Installation">README</a>
+section, load the package into your environment.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scorecard)</span></code></pre></div>
 <div id="data-preparation" class="section level3">
 <h3>Data Preparation</h3>
-<p>Let’s use the <em>germancredit</em> dataset for the purposes of this demonstration.</p>
+<p>Let’s use the <em>germancredit</em> dataset for the purposes of this
+demonstration.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;germancredit&quot;</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(germancredit)</span></code></pre></div>
-<p>The <code>var_filter</code> function drops column variables that don’t meet the thresholds for missing rate (&gt; 95% by default), information value (IV) (&lt; 0.02 by default), or identical value rate (&gt; 95% by default).</p>
+<p>The <code>var_filter</code> function drops column variables that
+don’t meet the thresholds for missing rate (&gt; 95% by default),
+information value (IV) (&lt; 0.02 by default), or identical value rate
+(&gt; 95% by default).</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dt_f <span class="ot">&lt;-</span> <span class="fu">var_filter</span>(germancredit, <span class="at">y =</span> <span class="st">&quot;creditability&quot;</span>)</span></code></pre></div>
 </div>
 <div id="split-data-into-train-test-sets" class="section level3">
 <h3>Split Data into Train / Test Sets</h3>
-<p>When building scorecard models, a subset of the observations should be held out from the data used to train the model (similar to most other traditional modeling approaches), and instead be apportioned to the <em>test</em> set. We can perform this sampling to create the <em>train</em> and <em>test</em> datasets using the <code>split_df</code> function.</p>
+<p>When building scorecard models, a subset of the observations should
+be held out from the data used to train the model (similar to most other
+traditional modeling approaches), and instead be apportioned to the
+<em>test</em> set. We can perform this sampling to create the
+<em>train</em> and <em>test</em> datasets using the
+<code>split_df</code> function.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>dt_list <span class="ot">&lt;-</span> <span class="fu">split_df</span>(dt_f, <span class="at">y =</span> <span class="st">&quot;creditability&quot;</span>, <span class="at">ratios =</span> <span class="fu">c</span>(<span class="fl">0.6</span>, <span class="fl">0.4</span>), <span class="at">seed =</span> <span class="dv">30</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>label_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(dt_list, <span class="cf">function</span>(x) x<span class="sc">$</span>creditability)</span></code></pre></div>
 </div>
 <div id="weight-of-evidence-woe-binning" class="section level3">
 <h3>Weight-of-Evidence (WoE) binning</h3>
-<p>Weight-of-Evidence binning is a technique for binning both continuous and categorical independent variables in a way that provides the most robust bifurcation of the data against the dependent variable. This technique can be easily executed across all independent variables using the <code>woebin</code> function.</p>
+<p>Weight-of-Evidence binning is a technique for binning both continuous
+and categorical independent variables in a way that provides the most
+robust bifurcation of the data against the dependent variable. This
+technique can be easily executed across all independent variables using
+the <code>woebin</code> function.</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>bins <span class="ot">&lt;-</span> <span class="fu">woebin</span>(dt_f, <span class="at">y =</span> <span class="st">&quot;creditability&quot;</span>)</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># woebin_plot(bins)</span></span></code></pre></div>
-<p>The user can also adjust bin breaks interactively by using the <code>woebin_adj</code> function.</p>
+<p>The user can also adjust bin breaks interactively by using the
+<code>woebin_adj</code> function.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># breaks_adj &lt;- woebin_adj(dt_f, y = &quot;creditability&quot;, bins = bins)</span></span></code></pre></div>
-<p>Furthermore, the user can set the bin breaks manually via the <code>breaks_list = list()</code> argument in the <code>woebin</code> function. Note the use of <em>%,%</em> as a separator to create a single bin from two classes in a categorical independent variable.</p>
+<p>Furthermore, the user can set the bin breaks manually via the
+<code>breaks_list = list()</code> argument in the <code>woebin</code>
+function. Note the use of <em>%,%</em> as a separator to create a single
+bin from two classes in a categorical independent variable.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>breaks_adj <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">age.in.years =</span> <span class="fu">c</span>(<span class="dv">26</span>, <span class="dv">35</span>, <span class="dv">40</span>),</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">other.debtors.or.guarantors =</span> <span class="fu">c</span>(<span class="st">&quot;none&quot;</span>, <span class="st">&quot;co-applicant%,%guarantor&quot;</span>)</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>bins_adj <span class="ot">&lt;-</span> <span class="fu">woebin</span>(dt_f, <span class="at">y =</span> <span class="st">&quot;creditability&quot;</span>, <span class="at">breaks_list =</span> breaks_adj)</span></code></pre></div>
-<p>Once your WoE bins are established for all desired independent variables, apply the binning logic to the training and test datasets.</p>
+<p>Once your WoE bins are established for all desired independent
+variables, apply the binning logic to the training and test
+datasets.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>dt_woe_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(dt_list, <span class="cf">function</span>(x) <span class="fu">woebin_ply</span>(x, bins_adj))</span></code></pre></div>
 </div>
 <div id="logistic-regression-example" class="section level3">
 <h3>Logistic Regression Example</h3>
-<p>Logistic regression can often be leveraged effectively to assist in building the scorecards.</p>
+<p>Logistic regression can often be leveraged effectively to assist in
+building the scorecards.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>m1 <span class="ot">&lt;-</span> <span class="fu">glm</span>( creditability <span class="sc">~</span> ., <span class="at">family =</span> <span class="fu">binomial</span>(), <span class="at">data =</span> dt_woe_list<span class="sc">$</span>train)</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># vif(m1, merge_coef = TRUE) # summary(m1)</span></span>
@@ -383,7 +411,8 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>m2 <span class="ot">&lt;-</span> <span class="fu">eval</span>(m_step<span class="sc">$</span>call)</span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># vif(m2, merge_coef = TRUE) # summary(m2)</span></span></code></pre></div>
-<p>If oversampling is a concern, the following code chunk could be uncommented and run to help adjust for this issue.</p>
+<p>If oversampling is a concern, the following code chunk could be
+uncommented and run to help adjust for this issue.</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Read documentation on handling oversampling (support.sas.com/kb/22/601.html)</span></span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="co"># library(data.table)</span></span>
@@ -398,7 +427,9 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 </div>
 <div id="evaluating-model-performance-using-ks-roc" class="section level3">
 <h3>Evaluating Model Performance Using KS &amp; ROC</h3>
-<p>The <code>perf_eva</code> function provides model accuracy statistics (such as mse, rmse, logloss, r2, ks, auc, gini) and plots (such as ks, lift, gain, roc, lz, pr, f1, density).</p>
+<p>The <code>perf_eva</code> function provides model accuracy statistics
+(such as mse, rmse, logloss, r2, ks, auc, gini) and plots (such as ks,
+lift, gain, roc, lz, pr, f1, density).</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># First, get probabalistic predictions</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>pred_list <span class="ot">&lt;-</span> <span class="fu">lapply</span>(dt_woe_list, <span class="cf">function</span>(x) <span class="fu">predict</span>(m2, x, <span class="at">type =</span> <span class="st">&#39;response&#39;</span>))</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Then evaluate model accuracy  </span></span>
@@ -406,8 +437,15 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 </div>
 <div id="create-scorecard" class="section level3">
 <h3>Create Scorecard</h3>
-<p>Once the model has been selected, scorecards can be created via the <code>scorecard</code> function. Note that the default target points is 600, target odds is 1/19 and points to double the odds is 50. See <code>?scorecard</code> for more information on the function and its arguments.</p>
-<p>The scorecard can then be applied to the original data using the <code>scorecard_ply</code> function. Lastly, a chart encompassing Population Stability Index (PSI) statistics can be rendered via the <code>perf_psi</code> function.</p>
+<p>Once the model has been selected, scorecards can be created via the
+<code>scorecard</code> function. Note that the default target points is
+600, target odds is 1/19 and points to double the odds is 50. See
+<code>?scorecard</code> for more information on the function and its
+arguments.</p>
+<p>The scorecard can then be applied to the original data using the
+<code>scorecard_ply</code> function. Lastly, a chart encompassing
+Population Stability Index (PSI) statistics can be rendered via the
+<code>perf_psi</code> function.</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the card</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>card <span class="ot">&lt;-</span> <span class="fu">scorecard</span>(bins_adj, m2)</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Obtain Credit Scores</span></span>

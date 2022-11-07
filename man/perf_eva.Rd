@@ -51,78 +51,39 @@ NPV, Negative Predicted Value = true negative/total predicted negative
 }
 \examples{
 \donttest{
-# data preparing ------
 # load germancredit data
 data("germancredit")
 # filter variable via missing rate, iv, identical value rate
-dt_f = var_filter(germancredit, "creditability")
+dtvf = var_filter(germancredit, "creditability")
+
 # breaking dt into train and test
-dt_list = split_df(dt_f, "creditability")
+dt_list = split_df(dtvf, "creditability")
 label_list = lapply(dt_list, function(x) x$creditability)
 
-# woe binning ------
+# woe binning
 bins = woebin(dt_list$train, "creditability")
-# converting train and test into woe values
-dt_woe_list = lapply(dt_list, function(x) woebin_ply(x, bins))
+# scorecard, prob
+cardprob = scorecard2(bins, dt = dt_list, y = 'creditability', return_prob = TRUE)
 
-# glm ------
-m1 = glm(creditability ~ ., family = binomial(), data = dt_woe_list$train)
-# vif(m1, merge_coef = TRUE)
-# Select a formula-based model by AIC
-m_step = step(m1, direction="both", trace=FALSE)
-m2 = eval(m_step$call)
-# vif(m2, merge_coef = TRUE)
-
-# predicted proability
-pred_list = lapply(dt_woe_list, function(x) predict(m2, type = 'response', x))
-
-# scorecard ------
-card = scorecard(bins, m2)
-
-# credit score, only_total_score = TRUE
-score_list = lapply(dt_list, function(x) scorecard_ply(x, card))
-# credit score, only_total_score = FALSE
-score_list2 = lapply(dt_list, function(x) scorecard_ply(x, card,
-  only_total_score=FALSE))
-
+# credit score
+score_list = lapply(dt_list, function(x) scorecard_ply(x, cardprob$card))
 
 ###### perf_eva examples ######
 # Example I, one datset
 ## predicted p1
-perf_eva(pred = pred_list$train, label=dt_list$train$creditability,
-  title = 'train')
+perf_eva(pred = cardprob$prob$train, label=label_list$train,
+         title = 'train')
 ## predicted score
-# perf_eva(pred = score_list$train, label=dt_list$train$creditability,
+# perf_eva(pred = score_list$train, label=label_list$train,
 #   title = 'train')
 
 # Example II, multiple datsets
 ## predicted p1
-perf_eva(pred = pred_list, label = label_list,
- show_plot = c('ks', 'lift', 'gain', 'roc', 'lz', 'pr', 'f1', 'density'))
+perf_eva(pred = cardprob$prob, label = label_list,
+         show_plot = c('ks', 'lift', 'gain', 'roc', 'lz', 'pr', 'f1', 'density'))
 ## predicted score
 # perf_eva(score_list, label_list)
 
-
-###### perf_psi examples ######
-# Example I # only total psi
-psi1 = perf_psi(score = score_list, label = label_list)
-psi1$psi  # psi data frame
-psi1$pic  # pic of score distribution
-
-# Example II # both total and variable psi
-psi2 = perf_psi(score = score_list2, label = label_list)
-# psi2$psi  # psi data frame
-# psi2$pic  # pic of score distribution
-
-
-###### gains_table examples ######
-# Example I, input score and label can be a list or a vector
-g1 = gains_table(score = score_list$train, label = label_list$train)
-g2 = gains_table(score = score_list, label = label_list)
-
-# Example II, specify the bins number and type
-g3 = gains_table(score = score_list, label = label_list, bin_num = 20)
-g4 = gains_table(score = score_list, label = label_list, method = 'width')
 }
 
 }
