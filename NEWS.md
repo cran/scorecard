@@ -1,3 +1,9 @@
+# scorecard 0.4.1
+
+* added correlation matrix to the report function.
+* added a new function scorecard_pmml.
+* adjusted var_filter and var_filter2 function.
+
 # scorecard 0.4.0
 
 * remove the |> operator to support R < 4.1. 
@@ -44,7 +50,7 @@
 * added a function `describe` that calculatess statistic parameters for exploratory data analysis.
 * replace good/bad with neg/pos.
 * replace NaN with NA if it exists in the input data.
-* addd [] after the returned DataTable in gains_table and woebin function in order to directly display the datatable when printing.
+* added [] after the returned DataTable in gains_table and woebin function in order to directly display the datatable when printing.
 
 # scorecard 0.3.1
 

@@ -6,6 +6,7 @@
 #' @param y Name of y variable.
 #' @param x Name of x variables. Defaults to NULL. If x is NULL, then all columns except y are counted as x variables.
 #' @param breaks_list A list of break points. It can be extracted from \code{woebin} and \code{woebin_adj} via the argument save_breaks_list.
+#' @param x_name A vector of x variables' name.
 #' @param special_values The values specified in special_values will be in separate bins. Defaults to NULL.
 #' @param seed A random seed to split input data frame. Defaults to 618. If it is NULL, input dt will not split into two datasets.
 #' @param save_report The name of xlsx file where the report is to be saved. Defaults to 'report'.
@@ -89,15 +90,14 @@
 #' }
 #'
 #' @import openxlsx
-#' @importFrom stats as.formula glm predict.glm
+#' @importFrom stats as.formula glm predict.glm cor
 #' @export
-report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_report='report', positive='bad|1', ...) {
+report = function(dt, y, x, breaks_list, x_name = NULL, special_values=NULL, seed=618, save_report='report', positive='bad|1', ...) {
   # info_value = gvif = . = variable = bin = woe = points = NULL
-  . = bin = gvif = info_value = points = variable = woe = points = name = NULL
+  . = bin = gvif = info_value = points = variable = woe = points = name = x1 = NULL
 
   kwargs = list(...)
   # x name
-  x_name = kwargs[['x_name']]
   if (!is.null(x_name)) {
     if (inherits(x_name, 'character')) {
       x_name = setDT(list(variable=x, name = x_name))
@@ -173,24 +173,6 @@ report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_rep
   writeData(wb, sheet, dt_dtinfo, startRow=1, startCol=1, colNames=T)
   writeData(wb, sheet, dt_xdea, startRow=nrow(dt_dtinfo)+4, startCol=1, colNames=T)
 
-  # model coefficients ------
-  n = n+1
-  cat_bullet(sprintf("sheet%s - model coefficients", n), bullet = "tick", bullet_col = "green", col = 'grey')
-  sheet  <- addWorksheet(wb, sheetName="model coefficients")
-
-  dt_vif = vif(m, merge_coef = TRUE)[, gvif := round(gvif, 4)]
-  dt_iv = iv(dat_woe_lst[[1]][,c(paste0(x,"_woe"), y),with=FALSE], y, order = FALSE)[, info_value := round(info_value, 4)]
-  # dt_mr = data.table(variable=paste0(x,'_woe'), missing_rate=dat_lst[[1]][,x,with=FALSE][, sapply(.SD, function(x) sum(is.na(x))/.N)])
-
-  sum_tbl = Reduce(
-    function(x,y) merge(x,y, all.x=TRUE, by='variable', sort=FALSE), list(dt_vif, dt_iv, copy(dt_xdea)[, variable := paste0(variable, '_woe')])
-  )[, variable := sub('_woe$', '', variable)]
-  if (!is.null(x_name)) sum_tbl = merge(x_name, sum_tbl, by = 'variable', sort = FALSE, all = TRUE)[c(.N, seq_len(.N-1)),]
-
-  writeData(wb,sheet, sprintf('Model coefficients based on %s dataset', names(dat_lst)[1]), startRow=1, startCol=1, colNames=F)
-  writeData(wb,sheet, sum_tbl, startRow=2, startCol=1, colNames=T)
-
-
 
   # model performance ------
   n = n+1
@@ -208,6 +190,38 @@ report = function(dt, y, x, breaks_list, special_values=NULL, seed=618, save_rep
   plot_nrow = ceiling(length(show_plot)/plot_ncol)
   insertPlot(wb, sheet, width = 8*plot_ncol, height = 7*plot_nrow, xy = NULL, startRow = nrow(eva_tbl)+4, startCol = 1, fileType = "png", units = "cm")
 
+
+  # model coefficients ------
+  n = n+1
+  cat_bullet(sprintf("sheet%s - model coefficients", n), bullet = "tick", bullet_col = "green", col = 'grey')
+  sheet  <- addWorksheet(wb, sheetName="model coefficients")
+
+  dt_vif = vif(m, merge_coef = TRUE)[, gvif := round(gvif, 4)]
+  dt_iv = iv(dat_woe_lst[[1]][,c(paste0(x,"_woe"), y),with=FALSE], y, order = FALSE)[, info_value := round(info_value, 4)]
+  # dt_mr = data.table(variable=paste0(x,'_woe'), missing_rate=dat_lst[[1]][,x,with=FALSE][, sapply(.SD, function(x) sum(is.na(x))/.N)])
+
+  sum_tbl = Reduce(
+    function(x,y) merge(x,y, all.x=TRUE, by='variable', sort=FALSE), list(dt_vif, dt_iv, copy(dt_xdea)[, variable := paste0(variable, '_woe')])
+  )[, variable := sub('_woe$', '', variable)]
+  if (!is.null(x_name)) sum_tbl = merge(x_name, sum_tbl, by = 'variable', sort = FALSE, all = TRUE)[c(.N, seq_len(.N-1)),]
+
+  writeData(wb,sheet, sprintf('Model coefficients based on %s dataset', names(dat_lst)[1]), startRow=1, startCol=1, colNames=F)
+  writeData(wb,sheet, sum_tbl, startRow=2, startCol=1, colNames=T)
+
+  # correlation
+  dtcor1 = rbindlist(lapply(dat_woe_lst[1], function(d) cor2(d,paste0(x,'_woe'), uptri = TRUE, diag = TRUE)))[, x1 := sub('_woe$', '', x1)]
+  setnames(dtcor1, 'x1', 'variable')
+  if (!is.null(x_name)) dtcor1 = merge(x_name, dtcor1, by = 'variable', sort = FALSE, all = TRUE)[]
+
+  writeData(wb,sheet, 'Correlation of variables in woe values', startRow=5+nrow(sum_tbl), startCol=1, colNames=F)
+  writeData(wb,sheet, dtcor1, startRow=6+nrow(sum_tbl), startCol=1, colNames=T)
+
+
+  # dtcor2 = rbindlist(lapply(dat_lst[1], function(d) cor2(d,x, uptri = TRUE, diag = TRUE)))
+  # setnames(dtcor2, 'x1', 'variable')
+  # if (!is.null(x_name)) dtcor2 = merge(x_name, dtcor2, by = 'variable', sort = FALSE, all = TRUE)[]
+  # writeData(wb,sheet, 'Correlation of numeric variables', startRow=9+nrow(sum_tbl)+nrow(dtcor1), startCol=1, colNames=F)
+  # writeData(wb,sheet, dtcor2, startRow=10+nrow(sum_tbl)+nrow(dtcor1), startCol=1, colNames=T)
 
 
   # variable binning ------
